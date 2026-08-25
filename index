@@ -2193,3 +2193,817 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
   });
 })();
 </script>
+
+<!-- =========================================================
+     TERRITÓRIOS DAS 10 CAS
+     BLOCO INDEPENDENTE PARA COLAR NO FINAL DO HTML
+========================================================= -->
+
+<style>
+/* legenda das áreas territoriais */
+.cas-territorio-legenda {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.cas-territorio-legenda-box {
+  width:14px;
+  height:14px;
+  border-radius:4px;
+  border:1px solid #64748b;
+  background:linear-gradient(
+    135deg,
+    #E8E6A4,
+    #D9AAA2,
+    #917B91,
+    #91B19A
+  );
+}
+
+/* rótulo que aparece sobre cada território */
+.cas-territorio-label {
+  background:rgba(255,255,255,.88) !important;
+  border:1px solid rgba(71,85,105,.35) !important;
+  border-radius:999px !important;
+  box-shadow:0 3px 10px rgba(15,23,42,.10) !important;
+  color:#0f172a !important;
+  font-size:11px !important;
+  font-weight:800 !important;
+  padding:3px 7px !important;
+}
+
+.cas-territorio-label:before {
+  display:none !important;
+}
+</style>
+
+<script>
+(function(){
+
+  /* Evita carregar a camada duas vezes */
+  if (window.__TERRITORIOS_CAS_SMAS__) {
+    console.warn('Territórios CAS já carregados.');
+    return;
+  }
+
+  window.__TERRITORIOS_CAS_SMAS__ = true;
+
+  if (
+    typeof L === 'undefined' ||
+    typeof map === 'undefined'
+  ) {
+    console.error(
+      'Leaflet ou mapa não encontrados. ' +
+      'Este bloco deve ser colocado depois do código principal.'
+    );
+    return;
+  }
+
+
+  /* =====================================================
+     CORES DAS CAS
+
+     Tons inspirados no mapa físico da SMAS.
+  ===================================================== */
+
+  const CORES_TERRITORIOS_CAS = {
+
+    "1ª CAS":  "#EEECA8",
+    "2ª CAS":  "#DCE9E8",
+    "3ª CAS":  "#DEE8B0",
+    "4ª CAS":  "#D8AAA4",
+    "5ª CAS":  "#D8BD57",
+    "6ª CAS":  "#CABBC8",
+    "7ª CAS":  "#917D91",
+    "8ª CAS":  "#99969E",
+    "9ª CAS":  "#DDE99E",
+    "10ª CAS": "#91B09A"
+
+  };
+
+
+  /* =====================================================
+     POLÍGONOS APROXIMADOS DAS 10 CAS
+
+     Formato:
+     [latitude, longitude]
+
+     Você poderá futuramente trocar somente estas
+     coordenadas pela malha oficial.
+  ===================================================== */
+
+  const TERRITORIOS_CAS = [
+
+    /* -------------------------------------------------
+       1ª CAS
+       Centro / Região Portuária / São Cristóvão /
+       Rio Comprido / Santa Teresa
+    ------------------------------------------------- */
+
+    {
+      cas: "1ª CAS",
+
+      nome: "1ª CAS – CENTRO",
+
+      centro: [-22.907, -43.190],
+
+      coords: [
+
+        [-22.873, -43.235],
+        [-22.870, -43.213],
+        [-22.879, -43.190],
+        [-22.888, -43.168],
+        [-22.901, -43.158],
+        [-22.919, -43.164],
+        [-22.932, -43.181],
+        [-22.931, -43.203],
+        [-22.920, -43.219],
+        [-22.904, -43.229],
+        [-22.888, -43.237],
+        [-22.873, -43.235]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       2ª CAS
+       Tijuca / Vila Isabel / Zona Sul /
+       Rocinha / São Conrado
+    ------------------------------------------------- */
+
+    {
+      cas: "2ª CAS",
+
+      nome: "2ª CAS – GRANDE TIJUCA / ZONA SUL",
+
+      centro: [-22.954, -43.225],
+
+      coords: [
+
+        [-22.903, -43.268],
+        [-22.905, -43.239],
+        [-22.919, -43.218],
+        [-22.930, -43.201],
+
+        [-22.941, -43.184],
+        [-22.958, -43.172],
+        [-22.978, -43.170],
+        [-22.993, -43.182],
+
+        [-23.008, -43.205],
+        [-23.015, -43.233],
+        [-23.011, -43.264],
+
+        [-22.997, -43.286],
+        [-22.978, -43.297],
+        [-22.952, -43.298],
+
+        [-22.929, -43.288],
+        [-22.913, -43.278],
+        [-22.903, -43.268]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       3ª CAS
+       Méier / Engenho Novo / Inhaúma
+    ------------------------------------------------- */
+
+    {
+      cas: "3ª CAS",
+
+      nome: "3ª CAS – ENGENHO NOVO",
+
+      centro: [-22.893, -43.290],
+
+      coords: [
+
+        [-22.855, -43.323],
+        [-22.850, -43.292],
+        [-22.858, -43.263],
+
+        [-22.875, -43.244],
+        [-22.897, -43.246],
+        [-22.917, -43.261],
+
+        [-22.926, -43.283],
+        [-22.918, -43.313],
+        [-22.900, -43.329],
+
+        [-22.875, -43.332],
+        [-22.855, -43.323]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       4ª CAS
+       Bonsucesso / Penha / Ilha /
+       Complexo do Alemão / Maré
+    ------------------------------------------------- */
+
+    {
+      cas: "4ª CAS",
+
+      nome: "4ª CAS – BONSUCESSO",
+
+      centro: [-22.837, -43.245],
+
+      coords: [
+
+        [-22.770, -43.210],
+        [-22.760, -43.178],
+        [-22.777, -43.156],
+
+        [-22.806, -43.163],
+        [-22.823, -43.190],
+        [-22.838, -43.219],
+
+        [-22.855, -43.249],
+        [-22.862, -43.280],
+
+        [-22.848, -43.307],
+        [-22.823, -43.312],
+
+        [-22.800, -43.290],
+        [-22.785, -43.258],
+
+        [-22.770, -43.210]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       5ª CAS
+       Madureira / Rocha Miranda /
+       Marechal Hermes / Guadalupe
+    ------------------------------------------------- */
+
+    {
+      cas: "5ª CAS",
+
+      nome: "5ª CAS – MADUREIRA",
+
+      centro: [-22.867, -43.352],
+
+      coords: [
+
+        [-22.832, -43.390],
+        [-22.824, -43.355],
+        [-22.832, -43.323],
+
+        [-22.849, -43.311],
+        [-22.871, -43.317],
+
+        [-22.891, -43.337],
+        [-22.899, -43.368],
+
+        [-22.888, -43.397],
+        [-22.861, -43.404],
+
+        [-22.842, -43.397],
+        [-22.832, -43.390]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       6ª CAS
+       Irajá / Pavuna / Acari
+    ------------------------------------------------- */
+
+    {
+      cas: "6ª CAS",
+
+      nome: "6ª CAS – IRAJÁ",
+
+      centro: [-22.820, -43.355],
+
+      coords: [
+
+        [-22.776, -43.386],
+        [-22.773, -43.346],
+        [-22.785, -43.313],
+
+        [-22.807, -43.303],
+        [-22.833, -43.310],
+
+        [-22.849, -43.333],
+        [-22.850, -43.369],
+
+        [-22.839, -43.400],
+        [-22.814, -43.408],
+
+        [-22.790, -43.400],
+        [-22.776, -43.386]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       7ª CAS
+       Jacarepaguá / Barra / Recreio /
+       Vargens
+    ------------------------------------------------- */
+
+    {
+      cas: "7ª CAS",
+
+      nome: "7ª CAS – JACAREPAGUÁ",
+
+      centro: [-22.958, -43.405],
+
+      coords: [
+
+        [-22.883, -43.409],
+        [-22.879, -43.372],
+        [-22.892, -43.343],
+
+        [-22.919, -43.324],
+        [-22.950, -43.317],
+
+        [-22.982, -43.323],
+        [-23.011, -43.346],
+        [-23.031, -43.384],
+
+        [-23.041, -43.431],
+        [-23.038, -43.477],
+
+        [-23.018, -43.510],
+        [-22.990, -43.519],
+
+        [-22.958, -43.500],
+        [-22.928, -43.471],
+
+        [-22.902, -43.444],
+        [-22.883, -43.409]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       8ª CAS
+       Bangu / Realengo / Padre Miguel /
+       Deodoro
+    ------------------------------------------------- */
+
+    {
+      cas: "8ª CAS",
+
+      nome: "8ª CAS – BANGU",
+
+      centro: [-22.882, -43.475],
+
+      coords: [
+
+        [-22.818, -43.486],
+        [-22.818, -43.446],
+        [-22.833, -43.414],
+
+        [-22.857, -43.399],
+        [-22.886, -43.405],
+
+        [-22.909, -43.431],
+        [-22.919, -43.469],
+
+        [-22.912, -43.507],
+        [-22.890, -43.529],
+
+        [-22.857, -43.531],
+        [-22.830, -43.513],
+        [-22.818, -43.486]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       9ª CAS
+       Campo Grande / Cosmos /
+       Inhoaíba / Santíssimo
+    ------------------------------------------------- */
+
+    {
+      cas: "9ª CAS",
+
+      nome: "9ª CAS – CAMPO GRANDE",
+
+      centro: [-22.902, -43.579],
+
+      coords: [
+
+        [-22.839, -43.612],
+        [-22.834, -43.569],
+        [-22.843, -43.529],
+
+        [-22.862, -43.506],
+        [-22.887, -43.512],
+
+        [-22.910, -43.532],
+        [-22.931, -43.561],
+
+        [-22.945, -43.597],
+        [-22.936, -43.628],
+
+        [-22.910, -43.643],
+        [-22.877, -43.637],
+        [-22.851, -43.624],
+
+        [-22.839, -43.612]
+
+      ]
+    },
+
+
+    /* -------------------------------------------------
+       10ª CAS
+       Santa Cruz / Paciência /
+       Guaratiba / Sepetiba
+    ------------------------------------------------- */
+
+    {
+      cas: "10ª CAS",
+
+      nome: "10ª CAS – SANTA CRUZ",
+
+      centro: [-22.929, -43.682],
+
+      coords: [
+
+        [-22.813, -43.748],
+        [-22.808, -43.699],
+        [-22.819, -43.646],
+
+        [-22.841, -43.608],
+        [-22.872, -43.600],
+
+        [-22.905, -43.617],
+        [-22.934, -43.640],
+
+        [-22.965, -43.657],
+        [-22.998, -43.664],
+
+        [-23.023, -43.687],
+        [-23.036, -43.720],
+
+        [-23.024, -43.756],
+        [-22.997, -43.784],
+
+        [-22.960, -43.802],
+        [-22.916, -43.804],
+
+        [-22.875, -43.789],
+        [-22.840, -43.767],
+
+        [-22.813, -43.748]
+
+      ]
+    }
+
+  ];
+
+
+  /* =====================================================
+     GRUPO PRINCIPAL
+  ===================================================== */
+
+  const camadaTerritoriosCAS = L.layerGroup();
+
+  window.camadaTerritoriosCAS = camadaTerritoriosCAS;
+
+  const layersTerritorios = [];
+
+
+  /* =====================================================
+     CRIAÇÃO DOS POLÍGONOS
+  ===================================================== */
+
+  TERRITORIOS_CAS.forEach(function(item){
+
+    const polygon = L.polygon(item.coords, {
+
+      color: '#475569',
+
+      weight: 1.2,
+
+      opacity: .70,
+
+      fillColor: CORES_TERRITORIOS_CAS[item.cas],
+
+      fillOpacity: .27
+
+    });
+
+
+    polygon._casTerritorio = item.cas;
+
+
+    polygon.bindTooltip(
+
+      item.cas,
+
+      {
+
+        permanent: true,
+
+        direction: 'center',
+
+        className: 'cas-territorio-label',
+
+        opacity: .95
+
+      }
+
+    );
+
+
+    polygon.on('mouseover', function(){
+
+      polygon.setStyle({
+
+        weight: 2,
+
+        opacity: .95,
+
+        fillOpacity: .38
+
+      });
+
+    });
+
+
+    polygon.on('mouseout', function(){
+
+      atualizarTerritoriosCAS();
+
+    });
+
+
+    polygon.addTo(camadaTerritoriosCAS);
+
+    layersTerritorios.push(polygon);
+
+  });
+
+
+  camadaTerritoriosCAS.addTo(map);
+
+
+  /* =====================================================
+     GARANTE QUE TERRITÓRIOS FIQUEM ATRÁS DOS PONTOS
+  ===================================================== */
+
+  function enviarTerritoriosParaTras(){
+
+    layersTerritorios.forEach(function(layer){
+
+      if (
+        map.hasLayer(layer) &&
+        typeof layer.bringToBack === 'function'
+      ) {
+
+        layer.bringToBack();
+
+      }
+
+    });
+
+  }
+
+
+  setTimeout(enviarTerritoriosParaTras, 100);
+
+
+  /* =====================================================
+     IDENTIFICA QUAL CAS ESTÁ SELECIONADA
+  ===================================================== */
+
+  function getCasSelecionadaTerritorio(){
+
+    const ativo = document.querySelector('.cas-btn.active');
+
+    if (!ativo) return 'TODAS';
+
+    return ativo.textContent.trim();
+
+  }
+
+
+  /* =====================================================
+     DESTAQUE DOS TERRITÓRIOS
+
+     TODAS:
+     mostra todas normalmente.
+
+     CAS selecionada:
+     destaca somente aquela CAS.
+  ===================================================== */
+
+  function atualizarTerritoriosCAS(){
+
+    const selecionada = getCasSelecionadaTerritorio();
+
+
+    layersTerritorios.forEach(function(layer){
+
+      const cas = layer._casTerritorio;
+
+      const todas = selecionada === 'TODAS';
+
+      const ativa = cas === selecionada;
+
+
+      if (todas) {
+
+        layer.setStyle({
+
+          color: '#475569',
+
+          weight: 1.2,
+
+          opacity: .68,
+
+          fillColor: CORES_TERRITORIOS_CAS[cas],
+
+          fillOpacity: .27
+
+        });
+
+      }
+
+      else if (ativa) {
+
+        layer.setStyle({
+
+          color: '#0f172a',
+
+          weight: 3,
+
+          opacity: 1,
+
+          fillColor: CORES_TERRITORIOS_CAS[cas],
+
+          fillOpacity: .48
+
+        });
+
+      }
+
+      else {
+
+        layer.setStyle({
+
+          color: '#94a3b8',
+
+          weight: .7,
+
+          opacity: .22,
+
+          fillColor: CORES_TERRITORIOS_CAS[cas],
+
+          fillOpacity: .055
+
+        });
+
+      }
+
+    });
+
+
+    enviarTerritoriosParaTras();
+
+  }
+
+
+  /* =====================================================
+     INTEGRAÇÃO COM BOTÕES EXISTENTES
+  ===================================================== */
+
+  document
+    .querySelectorAll('.cas-btn')
+    .forEach(function(btn){
+
+      btn.addEventListener(
+        'click',
+        function(){
+
+          setTimeout(
+
+            atualizarTerritoriosCAS,
+
+            20
+
+          );
+
+        }
+
+      );
+
+    });
+
+
+  /* =====================================================
+     CHECKBOX NO MENU "CAMADAS"
+  ===================================================== */
+
+  const secaoCamadas =
+    document.querySelector('.sidebar .section');
+
+
+  if (secaoCamadas) {
+
+    const linha = document.createElement('div');
+
+    linha.className = 'check';
+
+    linha.innerHTML =
+
+      '<label>' +
+
+        '<input ' +
+          'type="checkbox" ' +
+          'id="toggleTerritoriosCAS" ' +
+          'checked' +
+        '>' +
+
+        '<span class="cas-territorio-legenda">' +
+
+          '<i class="cas-territorio-legenda-box"></i>' +
+
+          'Territórios das CAS' +
+
+        '</span>' +
+
+      '</label>';
+
+
+    secaoCamadas.appendChild(linha);
+
+
+    const checkbox =
+      document.getElementById(
+        'toggleTerritoriosCAS'
+      );
+
+
+    checkbox.addEventListener(
+      'change',
+      function(){
+
+        if (this.checked) {
+
+          camadaTerritoriosCAS.addTo(map);
+
+          atualizarTerritoriosCAS();
+
+          enviarTerritoriosParaTras();
+
+        }
+
+        else {
+
+          map.removeLayer(
+            camadaTerritoriosCAS
+          );
+
+        }
+
+      }
+
+    );
+
+  }
+
+
+  /* =====================================================
+     ATUALIZAÇÃO INICIAL
+  ===================================================== */
+
+  atualizarTerritoriosCAS();
+
+
+  /* =====================================================
+     GARANTE ORDEM APÓS ZOOM / MOVIMENTO
+  ===================================================== */
+
+  map.on(
+    'zoomend moveend',
+    enviarTerritoriosParaTras
+  );
+
+
+  console.log(
+    'Territórios das 10 CAS carregados.'
+  );
+
+})();
+</script>
