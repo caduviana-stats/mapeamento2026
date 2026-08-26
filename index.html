@@ -4497,230 +4497,367 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 
 
-<!-- ============================================================
-PATCH RÁPIDO — 6ª CAS
-
-Pavuna
-Costa Barros
-Barros Filho
-Anchieta
-
-Todos passam a integrar a 6ª CAS.
-Cole este bloco APÓS os scripts territoriais atuais.
-=============================================================== -->
-
 <script>
+/* ============================================================
+   CORREÇÃO GEOMÉTRICA — 6ª CAS
+
+   Pavuna
+   Costa Barros
+   Barros Filho
+   Anchieta
+
+   Este script:
+   1. encontra os polígonos oficiais desses 4 bairros;
+   2. remove cada polígono de qualquer outra CAS;
+   3. incorpora todos à 6ª CAS;
+   4. substitui a camada territorial existente.
+
+  =============================================================== */
+
 (function(){
 
-  if (window.__PATCH_6CAS_V1__) return;
-  window.__PATCH_6CAS_V1__ = true;
+  if (window.__CORRECAO_REAL_6CAS_V1__) return;
+  window.__CORRECAO_REAL_6CAS_V1__ = true;
 
 
-  function iniciar(){
+  function aguardar(){
 
-    if(
+    if (
       typeof L === "undefined" ||
-      typeof map === "undefined"
+      typeof map === "undefined" ||
+      typeof turf === "undefined" ||
+      !window.GEOJSON_TERRITORIOS_CAS
     ){
-      setTimeout(iniciar, 300);
+      setTimeout(aguardar, 300);
       return;
     }
 
-
-    const COR_6CAS = "#C6B5C5";
-
-
-    function normalizar(v){
-
-      return String(v || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toUpperCase();
-
-    }
+    corrigir();
+  }
 
 
-    /* bairros que devem pertencer à 6ª CAS */
-    const BAIRROS_6CAS = [
-
-      "PAVUNA",
-
-      "COSTA BARROS",
-
-      "BARROS FILHO",
-
-      "ANCHIETA"
-
-    ];
-
-
-    /* pane levemente acima da camada territorial principal */
-    if(!map.getPane("patch6CASPane")){
-
-      map.createPane(
-        "patch6CASPane"
-      );
-
-    }
+  const CORES_CAS = {
+    "1ª CAS":"#EEE99A",
+    "2ª CAS":"#DCE7E6",
+    "3ª CAS":"#DDE5A8",
+    "4ª CAS":"#D6A29D",
+    "5ª CAS":"#D3B547",
+    "6ª CAS":"#C6B5C5",
+    "7ª CAS":"#877486",
+    "8ª CAS":"#99969E",
+    "9ª CAS":"#DBE69D",
+    "10ª CAS":"#8AAA91"
+  };
 
 
-    const pane =
-      map.getPane(
-        "patch6CASPane"
-      );
-
-    pane.style.zIndex = 275;
-
-    pane.style.pointerEvents = "none";
-
-
-    const URL_BAIRROS =
-
-      "https://pgeo3.rio.rj.gov.br/arcgis/rest/services/" +
-
-      "Cartografia/Limites_administrativos/FeatureServer/4/query" +
-
-      "?where=1%3D1" +
-
-      "&outFields=*" +
-
-      "&returnGeometry=true" +
-
-      "&outSR=4326" +
-
-      "&f=geojson";
+  function normalizar(v){
+    return String(v || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g,"")
+      .replace(/\s+/g," ")
+      .trim()
+      .toUpperCase();
+  }
 
 
-    fetch(URL_BAIRROS)
+  const ALVOS = new Set([
+    "PAVUNA",
+    "COSTA BARROS",
+    "BARROS FILHO",
+    "ANCHIETA"
+  ]);
+
+
+  const URL =
+    "https://pgeo3.rio.rj.gov.br/arcgis/rest/services/" +
+    "Cartografia/Limites_administrativos/FeatureServer/4/query" +
+    "?where=1%3D1" +
+    "&outFields=*" +
+    "&returnGeometry=true" +
+    "&outSR=4326" +
+    "&f=geojson";
+
+
+  function corrigir(){
+
+    fetch(URL)
 
       .then(function(r){
 
-        if(!r.ok){
-
-          throw new Error(
-            "HTTP " + r.status
-          );
-
+        if (!r.ok){
+          throw new Error("HTTP " + r.status);
         }
 
         return r.json();
 
       })
 
+      .then(function(malha){
 
-      .then(function(data){
+        /* =====================================================
+           1. LOCALIZA OS 4 BAIRROS OFICIAIS
+        ===================================================== */
 
-        if(
-          !data ||
-          !Array.isArray(data.features)
-        ){
+        const bairros = malha.features.filter(function(f){
 
-          throw new Error(
-            "GeoJSON inválido"
+          const nome = normalizar(
+            f.properties && f.properties.nome
+          );
+
+          return ALVOS.has(nome);
+
+        });
+
+
+        console.log(
+          "Bairros encontrados para a 6ª CAS:",
+          bairros.map(f => f.properties.nome)
+        );
+
+
+        if (bairros.length !== 4){
+
+          console.warn(
+            "Esperávamos 4 bairros, mas foram encontrados:",
+            bairros.length
           );
 
         }
 
 
-        const selecionados =
-          data.features.filter(
-            function(feature){
+        /* =====================================================
+           2. CLONA O GEOJSON FINAL ATUAL
+        ===================================================== */
 
-              const nome =
-                normalizar(
-                  feature.properties &&
-                  feature.properties.nome
+        const corrigido = JSON.parse(
+          JSON.stringify(
+            window.GEOJSON_TERRITORIOS_CAS
+          )
+        );
+
+
+        /* =====================================================
+           3. LOCALIZA A 6ª CAS
+        ===================================================== */
+
+        let indice6 = corrigido.features.findIndex(function(f){
+
+          return (
+            f.properties &&
+            f.properties.cas === "6ª CAS"
+          );
+
+        });
+
+
+        if (indice6 === -1){
+
+          throw new Error(
+            "6ª CAS não encontrada no GeoJSON atual."
+          );
+
+        }
+
+
+        /* =====================================================
+           4. PARA CADA BAIRRO:
+
+           - SUBTRAI DE TODAS AS OUTRAS CAS
+           - UNE À 6ª CAS
+        ===================================================== */
+
+        bairros.forEach(function(bairro){
+
+          /* -----------------------------------------------
+             REMOVE O BAIRRO DAS OUTRAS 9 CAS
+          ----------------------------------------------- */
+
+          corrigido.features.forEach(function(feature, i){
+
+            if (i === indice6) return;
+
+            try{
+
+              const resultado =
+                turf.difference(
+                  turf.featureCollection([
+                    feature,
+                    bairro
+                  ])
                 );
 
 
-              return BAIRROS_6CAS.includes(
-                nome
+              if (resultado){
+
+                resultado.properties = {
+                  cas: feature.properties.cas
+                };
+
+                corrigido.features[i] = resultado;
+
+              }
+
+            }
+
+            catch(e){
+
+              console.warn(
+                "Não foi necessário/possível subtrair",
+                bairro.properties.nome,
+                "de",
+                feature.properties.cas
               );
 
             }
-          );
+
+          });
 
 
-        selecionados.forEach(
-          function(feature){
+          /* -----------------------------------------------
+             ADICIONA À 6ª CAS
+          ----------------------------------------------- */
 
-            feature.properties =
-              feature.properties || {};
+          try{
 
-            feature.properties.cas_patch =
-              "6ª CAS";
+            const atual6 =
+              corrigido.features[indice6];
+
+
+            const unido =
+              turf.union(
+                turf.featureCollection([
+                  atual6,
+                  bairro
+                ])
+              );
+
+
+            if (unido){
+
+              unido.properties = {
+                cas: "6ª CAS"
+              };
+
+              corrigido.features[indice6] =
+                unido;
+
+            }
 
           }
-        );
+
+          catch(e){
+
+            console.error(
+              "Erro ao integrar",
+              bairro.properties.nome,
+              "à 6ª CAS:",
+              e
+            );
+
+          }
+
+        });
 
 
-        const patch =
+        /* =====================================================
+           5. REMOVE CAMADAS/PATCHES TERRITORIAIS ANTIGOS
+        ===================================================== */
+
+        [
+          "territoriosCASGroup",
+          "patch6CAS",
+          "patchBuracosCAS",
+          "patchFillCAS",
+          "camadaPatchCASBuracos",
+          "camadaCorrecaoCAS",
+          "correcoesTerritoriaisCAS"
+        ].forEach(function(nome){
+
+          try{
+
+            const l = window[nome];
+
+            if (
+              l &&
+              map.hasLayer(l)
+            ){
+              map.removeLayer(l);
+            }
+
+          }
+          catch(e){}
+
+        });
+
+
+        /* =====================================================
+           6. CRIA NOVA CAMADA TERRITORIAL
+        ===================================================== */
+
+        const novaCamada =
           L.geoJSON(
-            {
-              type:
-                "FeatureCollection",
-
-              features:
-                selecionados
-            },
+            corrigido,
             {
 
-              pane:
-                "patch6CASPane",
+              pane:"territoriosCASPane",
 
-              interactive:
-                false,
+              interactive:false,
 
-              style:
-                function(){
+              style:function(feature){
 
-                  return {
+                const cas =
+                  feature.properties.cas;
 
-                    /* sem borda interna */
-                    stroke:
-                      false,
+                return {
+                  color:"#475569",
+                  weight:1.15,
+                  opacity:.62,
+                  fillColor:CORES_CAS[cas],
+                  fillOpacity:.20
+                };
 
-                    weight:
-                      0,
-
-                    fill:
-                      true,
-
-                    fillColor:
-                      COR_6CAS,
-
-                    fillOpacity:
-                      .20
-
-                  };
-
-                }
+              }
 
             }
           );
 
 
-        patch.addTo(
-          map
-        );
+        const novoGrupo =
+          L.layerGroup([
+            novaCamada
+          ]);
 
 
-        window.patch6CAS =
-          patch;
+        novoGrupo.addTo(map);
 
+
+        /* =====================================================
+           7. SUBSTITUI AS VARIÁVEIS GLOBAIS
+        ===================================================== */
+
+        window.GEOJSON_TERRITORIOS_CAS =
+          corrigido;
+
+        window.territoriosCASLayer =
+          novaCamada;
+
+        window.territoriosCASGroup =
+          novoGrupo;
+
+
+        /* =====================================================
+           8. FILTRO POR CAS
+        ===================================================== */
 
         function getCASAtiva(){
 
-          const ativo =
+          const btn =
             document.querySelector(
               ".cas-btn.active"
             );
 
-
-          return ativo
-            ? ativo.textContent.trim()
+          return btn
+            ? btn.textContent.trim()
             : "TODAS";
 
         }
@@ -4732,92 +4869,81 @@ Cole este bloco APÓS os scripts territoriais atuais.
             getCASAtiva();
 
 
-          patch.eachLayer(
-            function(layer){
+          novaCamada.eachLayer(function(layer){
+
+            const cas =
+              layer.feature.properties.cas;
 
 
-              if(
-                ativa === "TODAS"
-              ){
+            if (ativa === "TODAS"){
 
-                layer.setStyle({
-
-                  stroke:false,
-
-                  fillColor:
-                    COR_6CAS,
-
-                  fillOpacity:
-                    .20
-
-                });
-
-              }
-
-
-              else if(
-                ativa === "6ª CAS"
-              ){
-
-                layer.setStyle({
-
-                  stroke:false,
-
-                  fillColor:
-                    COR_6CAS,
-
-                  fillOpacity:
-                    .34
-
-                });
-
-              }
-
-
-              else{
-
-                layer.setStyle({
-
-                  stroke:false,
-
-                  fillColor:
-                    COR_6CAS,
-
-                  fillOpacity:
-                    .035
-
-                });
-
-              }
+              layer.setStyle({
+                color:"#475569",
+                weight:1.15,
+                opacity:.62,
+                fillColor:CORES_CAS[cas],
+                fillOpacity:.20
+              });
 
             }
-          );
+
+
+            else if (ativa === cas){
+
+              layer.setStyle({
+                color:"#334155",
+                weight:2.2,
+                opacity:.9,
+                fillColor:CORES_CAS[cas],
+                fillOpacity:.34
+              });
+
+            }
+
+
+            else{
+
+              layer.setStyle({
+                color:"#94a3b8",
+                weight:.5,
+                opacity:.15,
+                fillColor:CORES_CAS[cas],
+                fillOpacity:.035
+              });
+
+            }
+
+          });
 
         }
 
 
+        window.atualizarTerritoriosCAS =
+          atualizar;
+
+
         document
-          .querySelectorAll(
-            ".cas-btn"
-          )
-          .forEach(
-            function(btn){
+          .querySelectorAll(".cas-btn")
+          .forEach(function(btn){
 
-              btn.addEventListener(
-                "click",
-                function(){
+            btn.addEventListener(
+              "click",
+              function(){
 
-                  setTimeout(
-                    atualizar,
-                    20
-                  );
+                setTimeout(
+                  atualizar,
+                  20
+                );
 
-                }
-              );
+              }
+            );
 
-            }
-          );
+          });
 
+
+        /* =====================================================
+           9. CHECKBOX TERRITÓRIOS DAS CAS
+        ===================================================== */
 
         const check =
           document.getElementById(
@@ -4825,24 +4951,18 @@ Cole este bloco APÓS os scripts territoriais atuais.
           );
 
 
-        if(check){
+        if (check){
 
           check.addEventListener(
             "change",
             function(){
 
-              if(this.checked){
+              if (this.checked){
 
-                if(
-                  !map.hasLayer(
-                    patch
-                  )
+                if (
+                  !map.hasLayer(novoGrupo)
                 ){
-
-                  patch.addTo(
-                    map
-                  );
-
+                  novoGrupo.addTo(map);
                 }
 
                 atualizar();
@@ -4851,16 +4971,10 @@ Cole este bloco APÓS os scripts territoriais atuais.
 
               else{
 
-                if(
-                  map.hasLayer(
-                    patch
-                  )
+                if (
+                  map.hasLayer(novoGrupo)
                 ){
-
-                  map.removeLayer(
-                    patch
-                  );
-
+                  map.removeLayer(novoGrupo);
                 }
 
               }
@@ -4875,12 +4989,13 @@ Cole este bloco APÓS os scripts territoriais atuais.
 
 
         console.log(
-          "PATCH 6ª CAS aplicado:",
-          selecionados.map(
-            function(f){
-              return f.properties.nome;
-            }
-          )
+          "CORREÇÃO 6ª CAS CONCLUÍDA:",
+          [
+            "Pavuna",
+            "Costa Barros",
+            "Barros Filho",
+            "Anchieta"
+          ]
         );
 
       })
@@ -4889,7 +5004,7 @@ Cole este bloco APÓS os scripts territoriais atuais.
       .catch(function(erro){
 
         console.error(
-          "Erro no patch da 6ª CAS:",
+          "Erro na correção real da 6ª CAS:",
           erro
         );
 
@@ -4898,20 +5013,20 @@ Cole este bloco APÓS os scripts territoriais atuais.
   }
 
 
-  if(
+  if (
     document.readyState === "loading"
   ){
 
     document.addEventListener(
       "DOMContentLoaded",
-      iniciar
+      aguardar
     );
 
   }
 
   else{
 
-    iniciar();
+    aguardar();
 
   }
 
