@@ -3498,243 +3498,268 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 
 <!-- ============================================================
-     PATCH LIMPO DOS 5 BURACOS TERRITORIAIS
+     CORREÇÃO DEFINITIVA DOS 5 TERRITÓRIOS
+     
+     NÃO DESENHA "REMENDOS" POR CIMA.
+     
+     O script:
+     1. aguarda o território principal;
+     2. localiza cada bairro por coordenada;
+     3. obtém o polígono oficial;
+     4. une o polígono à CAS correta;
+     5. remove a camada territorial antiga;
+     6. redesenha as 10 CAS já corrigidas.
 
      São Cristóvão           -> 1ª CAS
      Oswaldo Cruz            -> 5ª CAS
      Freguesia/Jacarepaguá   -> 7ª CAS
      Barra Olímpica          -> 7ª CAS
      Vila Kennedy            -> 8ª CAS
-
-     SEM BORDA.
-     SEM TURF.
-     SEM UNION.
-     APENAS PREENCHIMENTO.
 =============================================================== -->
 
 <script>
 (function(){
 
-  if(window.__PATCH_LIMPO_CAS_V1__) return;
-  window.__PATCH_LIMPO_CAS_V1__ = true;
+  if(window.__CAS_CORRECAO_GEOMETRICA_V1__){
+    return;
+  }
+
+  window.__CAS_CORRECAO_GEOMETRICA_V1__ = true;
 
 
-  function iniciar(){
+  /* ============================================================
+     1. AGUARDA A CAMADA PRINCIPAL ESTAR PRONTA
+  ============================================================ */
+
+  function aguardarCamada(){
 
     if(
       typeof L === "undefined" ||
-      typeof map === "undefined"
+      typeof map === "undefined" ||
+      typeof turf === "undefined" ||
+      !window.GEOJSON_TERRITORIOS_CAS ||
+      !window.territoriosCASGroup
     ){
-      setTimeout(iniciar, 300);
+
+      setTimeout(
+        aguardarCamada,
+        300
+      );
+
       return;
-    }
-
-
-    /* =========================================================
-       1. CORES IDÊNTICAS À CAMADA PRINCIPAL
-    ========================================================= */
-
-    const CORES = {
-
-      "1ª CAS": "#EEE99A",
-
-      "5ª CAS": "#D3B547",
-
-      "7ª CAS": "#877486",
-
-      "8ª CAS": "#99969E"
-
-    };
-
-
-    /* =========================================================
-       2. NORMALIZAÇÃO
-    ========================================================= */
-
-    function normalizar(v){
-
-      return String(v || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toUpperCase();
 
     }
 
 
-    /* =========================================================
-       3. PANE
+    executarCorrecao();
 
-       Mesmo nível visual dos territórios,
-       mas ligeiramente acima para preencher os buracos.
-    ========================================================= */
+  }
 
-    if(!map.getPane("patchFillCASPane")){
 
-      map.createPane(
-        "patchFillCASPane"
-      );
+  /* ============================================================
+     2. CORES — AS MESMAS DO SCRIPT PRINCIPAL
+  ============================================================ */
 
+  const CORES_CAS = {
+
+    "1ª CAS":  "#EEE99A",
+
+    "2ª CAS":  "#DCE7E6",
+
+    "3ª CAS":  "#DDE5A8",
+
+    "4ª CAS":  "#D6A29D",
+
+    "5ª CAS":  "#D3B547",
+
+    "6ª CAS":  "#C6B5C5",
+
+    "7ª CAS":  "#877486",
+
+    "8ª CAS":  "#99969E",
+
+    "9ª CAS":  "#DBE69D",
+
+    "10ª CAS": "#8AAA91"
+
+  };
+
+
+  /* ============================================================
+     3. PONTOS INTERNOS DOS 5 BAIRROS
+
+     formato:
+     longitude, latitude
+
+     O nome aqui serve SOMENTE para diagnóstico.
+     A localização do polígono é espacial.
+  ============================================================ */
+
+  const CORRECOES = [
+
+    {
+      nome: "São Cristóvão",
+
+      cas: "1ª CAS",
+
+      lon: -43.22539,
+
+      lat: -22.90033
+    },
+
+
+    {
+      nome: "Oswaldo Cruz",
+
+      cas: "5ª CAS",
+
+      lon: -43.35000,
+
+      lat: -22.87056
+    },
+
+
+    {
+      nome: "Freguesia (Jacarepaguá)",
+
+      cas: "7ª CAS",
+
+      lon: -43.33308,
+
+      lat: -22.92234
+    },
+
+
+    {
+      nome: "Barra Olímpica",
+
+      cas: "7ª CAS",
+
+      lon: -43.38672,
+
+      lat: -22.97135
+    },
+
+
+    {
+      nome: "Vila Kennedy",
+
+      cas: "8ª CAS",
+
+      lon: -43.48833,
+
+      lat: -22.86056
     }
 
-    const pane =
-      map.getPane(
-        "patchFillCASPane"
-      );
-
-    pane.style.zIndex = 265;
-
-    pane.style.pointerEvents =
-      "none";
+  ];
 
 
-    /* =========================================================
-       4. REGRA EXATA
-    ========================================================= */
+  /* ============================================================
+     4. SERVIÇO OFICIAL DOS BAIRROS
+  ============================================================ */
 
-    function obterCAS(feature){
+  const BASE_URL =
 
-      const p =
-        feature.properties || {};
+    "https://pgeo3.rio.rj.gov.br/" +
 
-      const nome =
-        normalizar(
-          p.nome ||
-          p.NOME ||
-          ""
-        );
+    "arcgis/rest/services/" +
+
+    "Cartografia/Limites_administrativos/" +
+
+    "FeatureServer/4/query";
 
 
-      /* =======================================================
-         SÃO CRISTÓVÃO
-      ======================================================= */
+  /* ============================================================
+     5. CONSULTA ESPACIAL
 
-      if(
-        nome === "SAO CRISTOVAO" ||
-        nome === "IMPERIAL DE SAO CRISTOVAO"
-      ){
-        return "1ª CAS";
-      }
+     Em vez de procurar:
 
+     nome = "São Cristóvão"
 
-      /* =======================================================
-         OSWALDO CRUZ
-      ======================================================= */
+     perguntamos:
 
-      if(
-        nome === "OSWALDO CRUZ"
-      ){
-        return "5ª CAS";
-      }
+     "qual polígono contém este ponto?"
+
+     Isto elimina definitivamente os problemas de nomenclatura.
+  ============================================================ */
+
+  function buscarPoligono(item){
+
+    const params =
+      new URLSearchParams();
 
 
-      /* =======================================================
-         FREGUESIA DE JACAREPAGUÁ
-
-         Aceita somente nomes explicitamente de Jacarepaguá.
-         NÃO pega a Freguesia da Ilha.
-      ======================================================= */
-
-      if(
-        nome === "FREGUESIA (JACAREPAGUA)" ||
-        nome === "FREGUESIA DE JACAREPAGUA"
-      ){
-        return "7ª CAS";
-      }
+    params.set(
+      "geometry",
+      item.lon + "," + item.lat
+    );
 
 
-      /*
-         Caso a camada use apenas "Freguesia",
-         checamos a Região Administrativa.
-      */
-
-      if(
-        nome === "FREGUESIA"
-      ){
-
-        const ra =
-          normalizar(
-            p.regiao_adm ||
-            p.REGIAO_ADM ||
-            ""
-          );
-
-        if(
-          ra.includes("JACAREPAGUA")
-        ){
-          return "7ª CAS";
-        }
-
-      }
+    params.set(
+      "geometryType",
+      "esriGeometryPoint"
+    );
 
 
-      /* =======================================================
-         BARRA OLÍMPICA
-      ======================================================= */
-
-      if(
-        nome === "BARRA OLIMPICA"
-      ){
-        return "7ª CAS";
-      }
+    params.set(
+      "inSR",
+      "4326"
+    );
 
 
-      /* =======================================================
-         VILA KENNEDY
-      ======================================================= */
-
-      if(
-        nome === "VILA KENNEDY" ||
-        nome === "VILA KENEDY"
-      ){
-        return "8ª CAS";
-      }
+    params.set(
+      "spatialRel",
+      "esriSpatialRelIntersects"
+    );
 
 
-      return null;
-
-    }
-
-
-    /* =========================================================
-       5. URL DA MALHA OFICIAL
-    ========================================================= */
-
-    const URL =
-
-      "https://pgeo3.rio.rj.gov.br/arcgis/rest/services/" +
-
-      "Cartografia/Limites_administrativos/FeatureServer/4/query" +
-
-      "?where=1%3D1" +
-
-      "&outFields=*" +
-
-      "&returnGeometry=true" +
-
-      "&outSR=4326" +
-
-      "&f=geojson";
+    params.set(
+      "outFields",
+      "*"
+    );
 
 
-    /* =========================================================
-       6. CARREGA
-    ========================================================= */
+    params.set(
+      "returnGeometry",
+      "true"
+    );
 
-    fetch(URL)
 
-      .then(function(r){
+    params.set(
+      "outSR",
+      "4326"
+    );
 
-        if(!r.ok){
+
+    params.set(
+      "f",
+      "geojson"
+    );
+
+
+    const url =
+      BASE_URL +
+      "?" +
+      params.toString();
+
+
+    return fetch(url)
+
+      .then(function(response){
+
+        if(!response.ok){
 
           throw new Error(
-            "HTTP " + r.status
+            "HTTP " +
+            response.status +
+            " — " +
+            item.nome
           );
 
         }
 
-        return r.json();
+
+        return response.json();
 
       })
 
@@ -3743,370 +3768,698 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
         if(
           !data ||
-          !Array.isArray(
-            data.features
-          )
+          !Array.isArray(data.features) ||
+          data.features.length === 0
         ){
 
           throw new Error(
-            "GeoJSON inválido"
+            "Nenhum polígono encontrado para " +
+            item.nome
           );
 
         }
 
 
-        /* =====================================================
-           7. SELECIONA SOMENTE OS POLÍGONOS CORRETOS
-        ===================================================== */
+        /*
+          Como o ponto está dentro do bairro,
+          pegamos a primeira geometria retornada.
+        */
 
-        const selecionados = [];
-
-
-        data.features.forEach(
-          function(feature){
-
-            const cas =
-              obterCAS(
-                feature
-              );
+        const feature =
+          JSON.parse(
+            JSON.stringify(
+              data.features[0]
+            )
+          );
 
 
-            if(!cas) return;
-
-
-            const copia =
-              JSON.parse(
-                JSON.stringify(
-                  feature
-                )
-              );
-
-
-            copia.properties.cas_patch =
-              cas;
-
-
-            selecionados.push(
-              copia
-            );
-
-          }
-        );
-
-
-        /* =====================================================
-           8. CAMADA DE PREENCHIMENTO
-
-           O ponto principal:
-
-           stroke:false
-
-           Portanto NÃO haverá:
-           - borda roxa estranha
-           - contorno amarelo em São Cristóvão
-           - linha interna entre o bairro e a CAS
-        ===================================================== */
-
-        const patch =
-          L.geoJSON(
-            {
-              type:
-                "FeatureCollection",
-
-              features:
-                selecionados
-            },
+        feature.properties =
+          Object.assign(
+            {},
+            feature.properties,
             {
 
-              pane:
-                "patchFillCASPane",
+              cas_destino:
+                item.cas,
 
-              interactive:
-                false,
-
-
-              style:
-                function(feature){
-
-                  const cas =
-                    feature
-                      .properties
-                      .cas_patch;
-
-
-                  return {
-
-                    stroke:
-                      false,
-
-                    weight:
-                      0,
-
-                    opacity:
-                      0,
-
-                    fill:
-                      true,
-
-                    fillColor:
-                      CORES[cas],
-
-                    fillOpacity:
-                      .20
-
-                  };
-
-                }
+              correcao_nome:
+                item.nome
 
             }
           );
 
 
-        patch.addTo(
-          map
-        );
+        return {
 
+          item: item,
 
-        window.patchFillCAS =
-          patch;
+          feature: feature
 
-
-        /* =====================================================
-           9. FILTRO CAS
-        ===================================================== */
-
-        function CASAtiva(){
-
-          const ativo =
-            document.querySelector(
-              ".cas-btn.active"
-            );
-
-          return ativo
-            ? ativo.textContent.trim()
-            : "TODAS";
-
-        }
-
-
-        function atualizar(){
-
-          const ativa =
-            CASAtiva();
-
-
-          patch.eachLayer(
-            function(layer){
-
-              const cas =
-                layer
-                  .feature
-                  .properties
-                  .cas_patch;
-
-
-              if(
-                ativa === "TODAS"
-              ){
-
-                layer.setStyle({
-
-                  stroke:false,
-
-                  weight:0,
-
-                  fillColor:
-                    CORES[cas],
-
-                  fillOpacity:
-                    .20
-
-                });
-
-              }
-
-
-              else if(
-                ativa === cas
-              ){
-
-                layer.setStyle({
-
-                  stroke:false,
-
-                  weight:0,
-
-                  fillColor:
-                    CORES[cas],
-
-                  fillOpacity:
-                    .34
-
-                });
-
-              }
-
-
-              else{
-
-                layer.setStyle({
-
-                  stroke:false,
-
-                  weight:0,
-
-                  fillColor:
-                    CORES[cas],
-
-                  fillOpacity:
-                    .035
-
-                });
-
-              }
-
-            }
-          );
-
-        }
-
-
-        /* =====================================================
-           10. BOTÕES CAS
-        ===================================================== */
-
-        document
-          .querySelectorAll(
-            ".cas-btn"
-          )
-          .forEach(
-            function(btn){
-
-              btn.addEventListener(
-                "click",
-                function(){
-
-                  setTimeout(
-                    atualizar,
-                    20
-                  );
-
-                }
-              );
-
-            }
-          );
-
-
-        /* =====================================================
-           11. CHECKBOX DOS TERRITÓRIOS
-        ===================================================== */
-
-        const check =
-          document.getElementById(
-            "toggleTerritoriosCASReal"
-          );
-
-
-        if(check){
-
-          check.addEventListener(
-            "change",
-            function(){
-
-              if(this.checked){
-
-                if(
-                  !map.hasLayer(
-                    patch
-                  )
-                ){
-
-                  patch.addTo(
-                    map
-                  );
-
-                }
-
-                atualizar();
-
-              }
-
-              else{
-
-                if(
-                  map.hasLayer(
-                    patch
-                  )
-                ){
-
-                  map.removeLayer(
-                    patch
-                  );
-
-                }
-
-              }
-
-            }
-          );
-
-        }
-
-
-        /* =====================================================
-           12. DIAGNÓSTICO
-
-           Precisamos que apareçam apenas as cinco áreas.
-        ===================================================== */
-
-        console.group(
-          "PATCH LIMPO CAS"
-        );
-
-
-        selecionados.forEach(
-          function(feature){
-
-            console.log(
-
-              feature.properties.nome,
-
-              "→",
-
-              feature.properties.cas_patch
-
-            );
-
-          }
-        );
-
-
-        console.log(
-          "Total:",
-          selecionados.length
-        );
-
-
-        console.groupEnd();
-
-
-        atualizar();
-
-      })
-
-
-      .catch(function(erro){
-
-        console.error(
-          "Erro no patch limpo:",
-          erro
-        );
+        };
 
       });
 
   }
 
+
+  /* ============================================================
+     6. FUNÇÃO DE UNIÃO
+
+     Aqui a diferença é fundamental:
+
+     o script principal tentou unir dezenas de bairros
+     ao mesmo tempo.
+
+     Agora uniremos:
+
+     CAS já pronta
+          +
+     UM bairro
+
+     Isso é muito mais estável.
+  ============================================================ */
+
+  function unirNaCAS(
+    casFeature,
+    bairroFeature,
+    cas
+  ){
+
+    try{
+
+      const resultado =
+        turf.union(
+
+          turf.featureCollection([
+
+            casFeature,
+
+            bairroFeature
+
+          ])
+
+        );
+
+
+      if(!resultado){
+
+        throw new Error(
+          "Turf retornou geometria vazia."
+        );
+
+      }
+
+
+      resultado.properties = {
+
+        cas: cas
+
+      };
+
+
+      return resultado;
+
+    }
+
+
+    catch(erro){
+
+      console.error(
+        "Falha ao integrar geometria em " +
+        cas,
+        erro
+      );
+
+
+      /*
+        Se houver falha real, NÃO desenhamos
+        um patch estranho por cima.
+
+        Mantemos a geometria anterior.
+      */
+
+      return casFeature;
+
+    }
+
+  }
+
+
+  /* ============================================================
+     7. EXECUÇÃO
+  ============================================================ */
+
+  function executarCorrecao(){
+
+
+    Promise.all(
+
+      CORRECOES.map(
+        buscarPoligono
+      )
+
+    )
+
+
+    .then(function(resultados){
+
+
+      /* ========================================================
+         8. CLONA A COLEÇÃO QUE JÁ ESTÁ FUNCIONANDO
+      ======================================================== */
+
+      const corrigido =
+        JSON.parse(
+          JSON.stringify(
+            window.GEOJSON_TERRITORIOS_CAS
+          )
+        );
+
+
+      /* ========================================================
+         9. LOCALIZA A FEATURE DE CADA CAS
+      ======================================================== */
+
+      function indiceDaCAS(cas){
+
+        return corrigido.features.findIndex(
+          function(feature){
+
+            return (
+              feature.properties &&
+              feature.properties.cas === cas
+            );
+
+          }
+        );
+
+      }
+
+
+      /* ========================================================
+         10. INTEGRA CADA BAIRRO À SUA CAS
+      ======================================================== */
+
+      resultados.forEach(
+        function(resultado){
+
+          const item =
+            resultado.item;
+
+
+          const bairro =
+            resultado.feature;
+
+
+          const indice =
+            indiceDaCAS(
+              item.cas
+            );
+
+
+          if(indice === -1){
+
+            console.error(
+              "CAS não encontrada:",
+              item.cas
+            );
+
+            return;
+
+          }
+
+
+          const casAtual =
+            corrigido.features[
+              indice
+            ];
+
+
+          const casNova =
+            unirNaCAS(
+
+              casAtual,
+
+              bairro,
+
+              item.cas
+
+            );
+
+
+          corrigido.features[
+            indice
+          ] = casNova;
+
+
+          console.log(
+
+            "Integrado:",
+
+            item.nome,
+
+            "→",
+
+            item.cas,
+
+            "| bairro encontrado na base:",
+
+            bairro.properties &&
+            bairro.properties.nome
+
+          );
+
+        }
+      );
+
+
+      /* ========================================================
+         11. REMOVE A CAMADA TERRITORIAL ANTIGA
+      ======================================================== */
+
+      try{
+
+        if(
+          window.territoriosCASGroup &&
+          map.hasLayer(
+            window.territoriosCASGroup
+          )
+        ){
+
+          map.removeLayer(
+            window.territoriosCASGroup
+          );
+
+        }
+
+      }
+      catch(e){}
+
+
+      /* ========================================================
+         12. CRIA A NOVA CAMADA
+
+         Agora os bairros fazem PARTE da geometria da CAS.
+
+         Não existe:
+         - camada de remendo;
+         - borda duplicada;
+         - polígono desenhado por cima.
+      ======================================================== */
+
+      const camadaCorrigida =
+        L.geoJSON(
+          corrigido,
+          {
+
+            pane:
+              "territoriosCASPane",
+
+            interactive:
+              false,
+
+
+            style:
+              function(feature){
+
+                const cas =
+                  feature.properties.cas;
+
+
+                return {
+
+                  color:
+                    "#475569",
+
+                  weight:
+                    1.15,
+
+                  opacity:
+                    .62,
+
+                  fillColor:
+                    CORES_CAS[cas],
+
+                  fillOpacity:
+                    .20
+
+                };
+
+              }
+
+          }
+        );
+
+
+      const grupoCorrigido =
+        L.layerGroup([
+
+          camadaCorrigida
+
+        ]);
+
+
+      grupoCorrigido.addTo(
+        map
+      );
+
+
+      /* ========================================================
+         13. SUBSTITUI AS REFERÊNCIAS GLOBAIS
+
+         A partir daqui, esta passa a ser a camada oficial
+         utilizada pelo mapa.
+      ======================================================== */
+
+      window.GEOJSON_TERRITORIOS_CAS =
+        corrigido;
+
+
+      window.territoriosCASLayer =
+        camadaCorrigida;
+
+
+      window.territoriosCASGroup =
+        grupoCorrigido;
+
+
+      /* ========================================================
+         14. FILTRO POR CAS
+      ======================================================== */
+
+      function obterCASAtiva(){
+
+        const ativo =
+          document.querySelector(
+            ".cas-btn.active"
+          );
+
+
+        return ativo
+          ? ativo.textContent.trim()
+          : "TODAS";
+
+      }
+
+
+      function atualizarCorrigido(){
+
+        const ativa =
+          obterCASAtiva();
+
+
+        camadaCorrigida.eachLayer(
+          function(layer){
+
+            const cas =
+              layer
+                .feature
+                .properties
+                .cas;
+
+
+            /* TODAS */
+
+            if(
+              ativa === "TODAS"
+            ){
+
+              layer.setStyle({
+
+                color:
+                  "#475569",
+
+                weight:
+                  1.15,
+
+                opacity:
+                  .62,
+
+                fillColor:
+                  CORES_CAS[cas],
+
+                fillOpacity:
+                  .20
+
+              });
+
+            }
+
+
+            /* CAS SELECIONADA */
+
+            else if(
+              ativa === cas
+            ){
+
+              layer.setStyle({
+
+                color:
+                  "#334155",
+
+                weight:
+                  2.2,
+
+                opacity:
+                  .9,
+
+                fillColor:
+                  CORES_CAS[cas],
+
+                fillOpacity:
+                  .34
+
+              });
+
+            }
+
+
+            /* DEMAIS */
+
+            else{
+
+              layer.setStyle({
+
+                color:
+                  "#94a3b8",
+
+                weight:
+                  .5,
+
+                opacity:
+                  .15,
+
+                fillColor:
+                  CORES_CAS[cas],
+
+                fillOpacity:
+                  .035
+
+              });
+
+            }
+
+          }
+        );
+
+      }
+
+
+      window.atualizarTerritoriosCAS =
+        atualizarCorrigido;
+
+
+      /* ========================================================
+         15. BOTÕES CAS
+
+         Acrescentamos apenas a atualização da nova camada.
+      ======================================================== */
+
+      document
+        .querySelectorAll(
+          ".cas-btn"
+        )
+        .forEach(
+          function(btn){
+
+            btn.addEventListener(
+              "click",
+              function(){
+
+                setTimeout(
+                  atualizarCorrigido,
+                  25
+                );
+
+              }
+            );
+
+          }
+        );
+
+
+      /* ========================================================
+         16. CORRIGE O CHECKBOX
+
+         O listener antigo ainda conhece a camada antiga.
+
+         Clonamos o checkbox para remover os listeners antigos
+         e ligamos somente a camada corrigida.
+      ======================================================== */
+
+      const checkboxAntigo =
+        document.getElementById(
+          "toggleTerritoriosCASReal"
+        );
+
+
+      if(checkboxAntigo){
+
+        const checkboxNovo =
+          checkboxAntigo.cloneNode(
+            true
+          );
+
+
+        checkboxAntigo
+          .parentNode
+          .replaceChild(
+
+            checkboxNovo,
+
+            checkboxAntigo
+
+          );
+
+
+        checkboxNovo.addEventListener(
+          "change",
+          function(){
+
+
+            if(this.checked){
+
+              if(
+                !map.hasLayer(
+                  grupoCorrigido
+                )
+              ){
+
+                grupoCorrigido.addTo(
+                  map
+                );
+
+              }
+
+
+              atualizarCorrigido();
+
+            }
+
+
+            else{
+
+              if(
+                map.hasLayer(
+                  grupoCorrigido
+                )
+              ){
+
+                map.removeLayer(
+                  grupoCorrigido
+                );
+
+              }
+
+            }
+
+          }
+        );
+
+      }
+
+
+      /* ========================================================
+         17. ESTADO INICIAL
+      ======================================================== */
+
+      atualizarCorrigido();
+
+
+      /* ========================================================
+         18. DIAGNÓSTICO
+      ======================================================== */
+
+      console.group(
+        "CORREÇÃO GEOMÉTRICA DAS CAS"
+      );
+
+
+      resultados.forEach(
+        function(resultado){
+
+          console.log(
+
+            resultado.item.nome,
+
+            "→",
+
+            resultado.item.cas,
+
+            "| polígono identificado:",
+
+            resultado.feature
+              .properties &&
+            resultado.feature
+              .properties.nome
+
+          );
+
+        }
+      );
+
+
+      console.log(
+
+        "Total de territórios finais:",
+
+        corrigido.features.length
+
+      );
+
+
+      console.log(
+
+        "GeoJSON corrigido:",
+
+        corrigido
+
+      );
+
+
+      console.groupEnd();
+
+    })
+
+
+    .catch(function(erro){
+
+      console.error(
+
+        "ERRO NA CORREÇÃO GEOMÉTRICA DAS CAS:",
+
+        erro
+
+      );
+
+    });
+
+  }
+
+
+  /* ============================================================
+     19. INÍCIO
+  ============================================================ */
 
   if(
     document.readyState ===
@@ -4115,14 +4468,14 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
     document.addEventListener(
       "DOMContentLoaded",
-      iniciar
+      aguardarCamada
     );
 
   }
 
   else{
 
-    iniciar();
+    aguardarCamada();
 
   }
 
