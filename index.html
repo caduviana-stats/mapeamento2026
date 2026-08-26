@@ -2196,7 +2196,6 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 
 
-
 <script>
 /* ============================================================
    TERRITÓRIOS DAS 10 CAS — VERSÃO ROBUSTA
@@ -2605,94 +2604,65 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
        ESTAS VENCEM QUALQUER OUTRA REGRA
     ========================================================= */
 
-   const AJUSTES = {
+    const AJUSTES = {
 
-  /* =========================
-     1ª CAS
-  ========================= */
+      /* 1ª CAS */
 
-  "SAO CRISTOVAO":
-    "1ª CAS",
-
-  "IMPERIAL DE SAO CRISTOVAO":
-    "1ª CAS",
+      "SAO CRISTOVAO":
+        "1ª CAS",
 
 
-  /* =========================
-     3ª CAS
-  ========================= */
+      /* 3ª CAS */
 
-  "INHAUMA":
-    "3ª CAS",
+      "INHAUMA":
+        "3ª CAS",
 
-  "TOMAS COELHO":
-    "3ª CAS",
+      "TOMAS COELHO":
+        "3ª CAS",
 
 
-  /* =========================
-     4ª CAS
-  ========================= */
+      /* 4ª CAS */
 
-  "PAVUNA":
-    "4ª CAS",
+      "PAVUNA":
+        "4ª CAS",
 
-  "VILA DA PENHA":
-    "4ª CAS",
-
-  "FREGUESIA (ILHA DO GOVERNADOR)":
-    "4ª CAS",
+      "VILA DA PENHA":
+        "4ª CAS",
 
 
-  /* =========================
-     5ª CAS
-  ========================= */
+      /* 5ª CAS */
 
-  "MARIOPOLIS":
-    "5ª CAS",
+      "MARIOPOLIS":
+        "5ª CAS",
 
-  "OSWALDO CRUZ":
-    "5ª CAS",
+      "OSWALDO CRUZ":
+        "5ª CAS",
 
 
-  /* =========================
-     6ª CAS
-  ========================= */
+      /* 6ª CAS */
 
-  "ANCHIETA":
-    "6ª CAS",
+      "ANCHIETA":
+        "6ª CAS",
 
 
-  /* =========================
-     7ª CAS
-  ========================= */
+      /* 7ª CAS */
 
-  "FREGUESIA":
-    "7ª CAS",
-
-  "FREGUESIA (JACAREPAGUA)":
-    "7ª CAS",
-
-  "FREGUESIA DE JACAREPAGUA":
-    "7ª CAS",
-
-  "BARRA OLIMPICA":
-    "7ª CAS",
+      "BARRA OLIMPICA":
+        "7ª CAS",
 
 
-  /* =========================
-     8ª CAS
-  ========================= */
+      /* 8ª CAS */
 
-  "SANTISSIMO":
-    "8ª CAS",
+      "SANTISSIMO":
+        "8ª CAS",
 
-  "VILA KENNEDY":
-    "8ª CAS",
+      "VILA KENNEDY":
+        "8ª CAS",
 
-  "VILA KENEDY":
-    "8ª CAS"
+      "VILA KENEDY":
+        "8ª CAS"
 
-}; 
+    };
 
 
     /* =========================================================
@@ -2701,142 +2671,154 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
     function identificarCAS(feature){
 
-  const p = feature.properties || {};
-
-  const bairro = normalizar(
-    p.nome ||
-    p.NOME ||
-    ""
-  );
-
-  const ra = normalizar(
-    p.regiao_adm ||
-    p.REGIAO_ADM ||
-    ""
-  );
+      const p =
+        feature.properties || {};
 
 
-  /* =========================================================
-     1. REGRAS PRIORITÁRIAS
-  ========================================================= */
-
-  if (AJUSTES[bairro]) {
-    return AJUSTES[bairro];
-  }
-
-
-  /* =========================================================
-     2. SÃO CRISTÓVÃO
-
-     Na malha oficial:
-     "Imperial de São Cristóvão"
-  ========================================================= */
-
-  if (
-    bairro === "IMPERIAL DE SAO CRISTOVAO" ||
-    bairro === "SAO CRISTOVAO"
-  ) {
-    return "1ª CAS";
-  }
+      const bairro =
+        normalizar(
+          p.nome ||
+          p.NOME ||
+          ""
+        );
 
 
-  /* =========================================================
-     3. OSWALDO CRUZ
-  ========================================================= */
-
-  if (
-    bairro === "OSWALDO CRUZ" ||
-    bairro.includes("OSWALDO CRUZ")
-  ) {
-    return "5ª CAS";
-  }
+      const ra =
+        normalizar(
+          p.regiao_adm ||
+          p.REGIAO_ADM ||
+          ""
+        );
 
 
-  /* =========================================================
-     4. FREGUESIA
+      /* -------------------------------------------------------
+         1. AJUSTES PRIORITÁRIOS
+      ------------------------------------------------------- */
 
-     A base oficial distingue explicitamente:
+      if (
+        AJUSTES[bairro]
+      ) {
 
-     Freguesia (Ilha do Governador)
-     Freguesia (Jacarepaguá)
-  ========================================================= */
+        return (
+          AJUSTES[bairro]
+        );
 
-  if (
-    bairro === "FREGUESIA (ILHA DO GOVERNADOR)"
-  ) {
-    return "4ª CAS";
-  }
-
-
-  if (
-    bairro === "FREGUESIA (JACAREPAGUA)" ||
-    bairro === "FREGUESIA DE JACAREPAGUA"
-  ) {
-    return "7ª CAS";
-  }
+      }
 
 
-  /*
-     Fallback para eventual versão da base
-     onde apareça apenas "Freguesia".
-  */
+      /* -------------------------------------------------------
+         2. FREGUESIA
 
-  if (bairro === "FREGUESIA") {
+         A malha possui duas Freguesias.
 
-    if (
-      ra.includes("ILHA") ||
-      ra.includes("GOVERNADOR")
-    ) {
-      return "4ª CAS";
+         Ilha do Governador -> 4ª
+         Jacarepaguá        -> 7ª
+      ------------------------------------------------------- */
+
+      if (
+        bairro === "FREGUESIA"
+      ) {
+
+        if (
+          ra.includes("ILHA") ||
+          ra.includes("GOVERNADOR")
+        ) {
+
+          return "4ª CAS";
+
+        }
+
+        return "7ª CAS";
+
+      }
+
+
+      /* -------------------------------------------------------
+         3. NOMES ALTERNATIVOS
+      ------------------------------------------------------- */
+
+      if (
+        bairro ===
+        "FREGUESIA (JACAREPAGUA)"
+      ) {
+
+        return "7ª CAS";
+
+      }
+
+
+      if (
+        bairro ===
+        "FREGUESIA DE JACAREPAGUA"
+      ) {
+
+        return "7ª CAS";
+
+      }
+
+
+      if (
+        bairro ===
+        "FREGUESIA (ILHA DO GOVERNADOR)"
+      ) {
+
+        return "4ª CAS";
+
+      }
+
+
+      if (
+        bairro ===
+        "BARRA OLIMPICA"
+      ) {
+
+        return "7ª CAS";
+
+      }
+
+
+      if (
+        bairro ===
+        "VILA KENNEDY" ||
+        bairro ===
+        "VILA KENEDY"
+      ) {
+
+        return "8ª CAS";
+
+      }
+
+
+      if (
+        bairro ===
+        "CAMPO DOS AFONSO" ||
+        bairro ===
+        "CAMPO DOS AFONSOS"
+      ) {
+
+        return "8ª CAS";
+
+      }
+
+
+      if (
+        bairro ===
+        "VICENTE DE CARVALHO" ||
+        bairro ===
+        "VINCENTE DE CARVALHO"
+      ) {
+
+        return "6ª CAS";
+
+      }
+
+
+      return (
+        INDICE[bairro] ||
+        null
+      );
+
     }
-
-    return "7ª CAS";
-
-  }
-
-
-  /* =========================================================
-     5. OUTROS AJUSTES
-  ========================================================= */
-
-  if (
-    bairro === "BARRA OLIMPICA"
-  ) {
-    return "7ª CAS";
-  }
-
-
-  if (
-    bairro === "VILA KENNEDY" ||
-    bairro === "VILA KENEDY"
-  ) {
-    return "8ª CAS";
-  }
-
-
-  if (
-    bairro === "CAMPO DOS AFONSO" ||
-    bairro === "CAMPO DOS AFONSOS"
-  ) {
-    return "8ª CAS";
-  }
-
-
-  if (
-    bairro === "VICENTE DE CARVALHO" ||
-    bairro === "VINCENTE DE CARVALHO"
-  ) {
-    return "6ª CAS";
-  }
-
-
-  /* =========================================================
-     6. REGRA NORMAL DA PLANILHA
-  ========================================================= */
-
-  return INDICE[bairro] || null;
-
-}
 
 
     /* =========================================================
