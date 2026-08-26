@@ -4481,3 +4481,439 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 })();
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- ============================================================
+PATCH RÁPIDO — 6ª CAS
+
+Pavuna
+Costa Barros
+Barros Filho
+Anchieta
+
+Todos passam a integrar a 6ª CAS.
+Cole este bloco APÓS os scripts territoriais atuais.
+=============================================================== -->
+
+<script>
+(function(){
+
+  if (window.__PATCH_6CAS_V1__) return;
+  window.__PATCH_6CAS_V1__ = true;
+
+
+  function iniciar(){
+
+    if(
+      typeof L === "undefined" ||
+      typeof map === "undefined"
+    ){
+      setTimeout(iniciar, 300);
+      return;
+    }
+
+
+    const COR_6CAS = "#C6B5C5";
+
+
+    function normalizar(v){
+
+      return String(v || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
+
+    }
+
+
+    /* bairros que devem pertencer à 6ª CAS */
+    const BAIRROS_6CAS = [
+
+      "PAVUNA",
+
+      "COSTA BARROS",
+
+      "BARROS FILHO",
+
+      "ANCHIETA"
+
+    ];
+
+
+    /* pane levemente acima da camada territorial principal */
+    if(!map.getPane("patch6CASPane")){
+
+      map.createPane(
+        "patch6CASPane"
+      );
+
+    }
+
+
+    const pane =
+      map.getPane(
+        "patch6CASPane"
+      );
+
+    pane.style.zIndex = 275;
+
+    pane.style.pointerEvents = "none";
+
+
+    const URL_BAIRROS =
+
+      "https://pgeo3.rio.rj.gov.br/arcgis/rest/services/" +
+
+      "Cartografia/Limites_administrativos/FeatureServer/4/query" +
+
+      "?where=1%3D1" +
+
+      "&outFields=*" +
+
+      "&returnGeometry=true" +
+
+      "&outSR=4326" +
+
+      "&f=geojson";
+
+
+    fetch(URL_BAIRROS)
+
+      .then(function(r){
+
+        if(!r.ok){
+
+          throw new Error(
+            "HTTP " + r.status
+          );
+
+        }
+
+        return r.json();
+
+      })
+
+
+      .then(function(data){
+
+        if(
+          !data ||
+          !Array.isArray(data.features)
+        ){
+
+          throw new Error(
+            "GeoJSON inválido"
+          );
+
+        }
+
+
+        const selecionados =
+          data.features.filter(
+            function(feature){
+
+              const nome =
+                normalizar(
+                  feature.properties &&
+                  feature.properties.nome
+                );
+
+
+              return BAIRROS_6CAS.includes(
+                nome
+              );
+
+            }
+          );
+
+
+        selecionados.forEach(
+          function(feature){
+
+            feature.properties =
+              feature.properties || {};
+
+            feature.properties.cas_patch =
+              "6ª CAS";
+
+          }
+        );
+
+
+        const patch =
+          L.geoJSON(
+            {
+              type:
+                "FeatureCollection",
+
+              features:
+                selecionados
+            },
+            {
+
+              pane:
+                "patch6CASPane",
+
+              interactive:
+                false,
+
+              style:
+                function(){
+
+                  return {
+
+                    /* sem borda interna */
+                    stroke:
+                      false,
+
+                    weight:
+                      0,
+
+                    fill:
+                      true,
+
+                    fillColor:
+                      COR_6CAS,
+
+                    fillOpacity:
+                      .20
+
+                  };
+
+                }
+
+            }
+          );
+
+
+        patch.addTo(
+          map
+        );
+
+
+        window.patch6CAS =
+          patch;
+
+
+        function getCASAtiva(){
+
+          const ativo =
+            document.querySelector(
+              ".cas-btn.active"
+            );
+
+
+          return ativo
+            ? ativo.textContent.trim()
+            : "TODAS";
+
+        }
+
+
+        function atualizar(){
+
+          const ativa =
+            getCASAtiva();
+
+
+          patch.eachLayer(
+            function(layer){
+
+
+              if(
+                ativa === "TODAS"
+              ){
+
+                layer.setStyle({
+
+                  stroke:false,
+
+                  fillColor:
+                    COR_6CAS,
+
+                  fillOpacity:
+                    .20
+
+                });
+
+              }
+
+
+              else if(
+                ativa === "6ª CAS"
+              ){
+
+                layer.setStyle({
+
+                  stroke:false,
+
+                  fillColor:
+                    COR_6CAS,
+
+                  fillOpacity:
+                    .34
+
+                });
+
+              }
+
+
+              else{
+
+                layer.setStyle({
+
+                  stroke:false,
+
+                  fillColor:
+                    COR_6CAS,
+
+                  fillOpacity:
+                    .035
+
+                });
+
+              }
+
+            }
+          );
+
+        }
+
+
+        document
+          .querySelectorAll(
+            ".cas-btn"
+          )
+          .forEach(
+            function(btn){
+
+              btn.addEventListener(
+                "click",
+                function(){
+
+                  setTimeout(
+                    atualizar,
+                    20
+                  );
+
+                }
+              );
+
+            }
+          );
+
+
+        const check =
+          document.getElementById(
+            "toggleTerritoriosCASReal"
+          );
+
+
+        if(check){
+
+          check.addEventListener(
+            "change",
+            function(){
+
+              if(this.checked){
+
+                if(
+                  !map.hasLayer(
+                    patch
+                  )
+                ){
+
+                  patch.addTo(
+                    map
+                  );
+
+                }
+
+                atualizar();
+
+              }
+
+              else{
+
+                if(
+                  map.hasLayer(
+                    patch
+                  )
+                ){
+
+                  map.removeLayer(
+                    patch
+                  );
+
+                }
+
+              }
+
+            }
+          );
+
+        }
+
+
+        atualizar();
+
+
+        console.log(
+          "PATCH 6ª CAS aplicado:",
+          selecionados.map(
+            function(f){
+              return f.properties.nome;
+            }
+          )
+        );
+
+      })
+
+
+      .catch(function(erro){
+
+        console.error(
+          "Erro no patch da 6ª CAS:",
+          erro
+        );
+
+      });
+
+  }
+
+
+  if(
+    document.readyState === "loading"
+  ){
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      iniciar
+    );
+
+  }
+
+  else{
+
+    iniciar();
+
+  }
+
+})();
+</script>
