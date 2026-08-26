@@ -3481,3 +3481,735 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 })();
 </script>
 
+
+<!-- ============================================================
+     CORREÇÃO FINAL DOS 3 BURACOS TERRITORIAIS
+
+     São Cristóvão -> 1ª CAS
+     Oswaldo Cruz  -> 5ª CAS
+     Freguesia     -> 7ª CAS
+
+     COLE DEPOIS DO SCRIPT ATUAL DOS TERRITÓRIOS
+=============================================================== -->
+
+<script>
+(function(){
+
+  if(window.__CORRECAO_3_BAIRROS_CAS__){
+    return;
+  }
+
+  window.__CORRECAO_3_BAIRROS_CAS__ = true;
+
+
+  /* ============================================================
+     AGUARDA O MAPA E A CAMADA TERRITORIAL
+  ============================================================ */
+
+  function iniciarCorrecao(){
+
+    if(
+      typeof L === "undefined" ||
+      typeof map === "undefined"
+    ){
+      setTimeout(iniciarCorrecao,300);
+      return;
+    }
+
+
+    /* ============================================================
+       MESMAS CORES DO SEU MAPA
+    ============================================================ */
+
+    const CORES = {
+
+      "1ª CAS": "#EEE99A",
+
+      "5ª CAS": "#D3B547",
+
+      "7ª CAS": "#877486"
+
+    };
+
+
+    /* ============================================================
+       NORMALIZAÇÃO ROBUSTA
+    ============================================================ */
+
+    function normalizar(valor){
+
+      return String(valor || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g,"")
+        .replace(/[–—]/g,"-")
+        .replace(/\s+/g," ")
+        .trim()
+        .toUpperCase();
+
+    }
+
+
+    /* ============================================================
+       GARANTE O MESMO PANE DOS TERRITÓRIOS
+    ============================================================ */
+
+    if(!map.getPane("territoriosCASPane")){
+
+      map.createPane(
+        "territoriosCASPane"
+      );
+
+      map.getPane(
+        "territoriosCASPane"
+      ).style.zIndex = 260;
+
+    }
+
+
+    /* ============================================================
+       GRUPO DAS CORREÇÕES
+    ============================================================ */
+
+    const grupoCorrecoes =
+      L.layerGroup();
+
+
+    grupoCorrecoes.addTo(map);
+
+
+    window.correcoesTerritoriaisCAS =
+      grupoCorrecoes;
+
+
+    const layersCorrecao = [];
+
+
+    /* ============================================================
+       MALHA OFICIAL DE BAIRROS
+    ============================================================ */
+
+    const URL_BAIRROS =
+
+      "https://pgeo3.rio.rj.gov.br/arcgis/rest/services/" +
+
+      "Cartografia/Limites_administrativos/FeatureServer/4/query" +
+
+      "?where=1%3D1" +
+
+      "&outFields=*" +
+
+      "&returnGeometry=true" +
+
+      "&outSR=4326" +
+
+      "&f=geojson";
+
+
+    /* ============================================================
+       IDENTIFICA APENAS OS 3 POLÍGONOS QUE PRECISAMOS
+    ============================================================ */
+
+    function identificarCorrecao(feature){
+
+      const p =
+        feature.properties || {};
+
+
+      const bairro =
+        normalizar(
+          p.nome ||
+          p.NOME ||
+          ""
+        );
+
+
+      const ra =
+        normalizar(
+          p.regiao_adm ||
+          p.REGIAO_ADM ||
+          ""
+        );
+
+
+      /* ========================================================
+         SÃO CRISTÓVÃO
+
+         Aceita:
+         São Cristóvão
+         Imperial de São Cristóvão
+         qualquer pequena variação que contenha o nome.
+      ======================================================== */
+
+      if(
+        bairro.includes(
+          "SAO CRISTOVAO"
+        )
+      ){
+
+        return "1ª CAS";
+
+      }
+
+
+      /* ========================================================
+         OSWALDO CRUZ
+      ======================================================== */
+
+      if(
+        bairro.includes(
+          "OSWALDO CRUZ"
+        )
+      ){
+
+        return "5ª CAS";
+
+      }
+
+
+      /* ========================================================
+         FREGUESIA DE JACAREPAGUÁ
+
+         NÃO captura a Freguesia da Ilha do Governador.
+      ======================================================== */
+
+      if(
+        bairro.includes(
+          "FREGUESIA"
+        )
+      ){
+
+        /*
+          Se explicitamente for Ilha do Governador,
+          não fazemos nada.
+        */
+
+        if(
+          bairro.includes("ILHA") ||
+          ra.includes("ILHA DO GOVERNADOR")
+        ){
+
+          return null;
+
+        }
+
+
+        /*
+          Freguesia de Jacarepaguá.
+        */
+
+        if(
+          bairro.includes("JACAREPAGUA") ||
+          ra.includes("JACAREPAGUA")
+        ){
+
+          return "7ª CAS";
+
+        }
+
+
+        /*
+          Fallback:
+
+          na base em que aparece somente "Freguesia",
+          mas não pertence à Ilha,
+          consideramos a Freguesia da 7ª CAS.
+        */
+
+        return "7ª CAS";
+
+      }
+
+
+      return null;
+
+    }
+
+
+    /* ============================================================
+       CARREGA A MALHA
+    ============================================================ */
+
+    fetch(URL_BAIRROS)
+
+      .then(function(resposta){
+
+        if(!resposta.ok){
+
+          throw new Error(
+            "Erro HTTP " +
+            resposta.status
+          );
+
+        }
+
+        return resposta.json();
+
+      })
+
+
+      .then(function(geojson){
+
+        if(
+          !geojson ||
+          !Array.isArray(
+            geojson.features
+          )
+        ){
+
+          throw new Error(
+            "GeoJSON inválido"
+          );
+
+        }
+
+
+        /* ======================================================
+           SELECIONA OS 3 BAIRROS
+        ====================================================== */
+
+        const corrigidos = [];
+
+
+        geojson.features.forEach(
+          function(feature){
+
+            const cas =
+              identificarCorrecao(
+                feature
+              );
+
+
+            if(!cas){
+              return;
+            }
+
+
+            /*
+              Mantemos a geometria original
+              integralmente.
+
+              NÃO EXISTE turf.union AQUI.
+            */
+
+            const copia =
+              JSON.parse(
+                JSON.stringify(feature)
+              );
+
+
+            copia.properties =
+              Object.assign(
+                {},
+                copia.properties,
+                {
+                  cas_correcao:cas
+                }
+              );
+
+
+            corrigidos.push(
+              copia
+            );
+
+          }
+        );
+
+
+        /* ======================================================
+           CRIA AS 3 ÁREAS
+
+           IMPORTANTE:
+
+           O contorno recebe a MESMA COR do preenchimento.
+
+           Assim ele cobre a linha escura do "buraco" existente
+           e visualmente funde a área ao restante da CAS.
+        ====================================================== */
+
+        const camadaCorrecao =
+          L.geoJSON(
+            {
+              type:
+                "FeatureCollection",
+
+              features:
+                corrigidos
+            },
+            {
+
+              pane:
+                "territoriosCASPane",
+
+              interactive:
+                false,
+
+
+              style:
+                function(feature){
+
+                  const cas =
+                    feature
+                      .properties
+                      .cas_correcao;
+
+
+                  return {
+
+                    /*
+                      Mesma cor da CAS.
+                    */
+
+                    color:
+                      CORES[cas],
+
+
+                    /*
+                      Espessura suficiente para cobrir
+                      a linha escura interna que aparece
+                      atualmente ao redor do bairro.
+                    */
+
+                    weight:
+                      2.2,
+
+
+                    opacity:
+                      1,
+
+
+                    fillColor:
+                      CORES[cas],
+
+
+                    /*
+                      Igual ao mapa em estado TODAS.
+                    */
+
+                    fillOpacity:
+                      .20
+
+                  };
+
+                }
+
+            }
+          );
+
+
+        camadaCorrecao.addTo(
+          grupoCorrecoes
+        );
+
+
+        window.camadaCorrecaoCAS =
+          camadaCorrecao;
+
+
+        layersCorrecao.push(
+          camadaCorrecao
+        );
+
+
+        /* ======================================================
+           IDENTIFICA CAS ATIVA
+        ====================================================== */
+
+        function obterCASAtiva(){
+
+          const ativo =
+            document.querySelector(
+              ".cas-btn.active"
+            );
+
+
+          return ativo
+            ? ativo.textContent.trim()
+            : "TODAS";
+
+        }
+
+
+        /* ======================================================
+           INTEGRA COM FILTRAR POR CAS
+        ====================================================== */
+
+        function atualizarCorrecoes(){
+
+          const ativa =
+            obterCASAtiva();
+
+
+          camadaCorrecao.eachLayer(
+            function(layer){
+
+              const cas =
+                layer
+                  .feature
+                  .properties
+                  .cas_correcao;
+
+
+              /* ================================================
+                 TODAS
+              ================================================ */
+
+              if(
+                ativa === "TODAS"
+              ){
+
+                layer.setStyle({
+
+                  color:
+                    CORES[cas],
+
+                  weight:
+                    2.2,
+
+                  opacity:
+                    1,
+
+                  fillColor:
+                    CORES[cas],
+
+                  fillOpacity:
+                    .20
+
+                });
+
+              }
+
+
+              /* ================================================
+                 CAS SELECIONADA
+              ================================================ */
+
+              else if(
+                ativa === cas
+              ){
+
+                layer.setStyle({
+
+                  color:
+                    CORES[cas],
+
+                  weight:
+                    2.5,
+
+                  opacity:
+                    1,
+
+                  fillColor:
+                    CORES[cas],
+
+                  fillOpacity:
+                    .34
+
+                });
+
+              }
+
+
+              /* ================================================
+                 OUTRAS CAS
+              ================================================ */
+
+              else{
+
+                layer.setStyle({
+
+                  color:
+                    CORES[cas],
+
+                  weight:
+                    1,
+
+                  opacity:
+                    .08,
+
+                  fillColor:
+                    CORES[cas],
+
+                  fillOpacity:
+                    .035
+
+                });
+
+              }
+
+            }
+          );
+
+        }
+
+
+        window.atualizarCorrecoesTerritoriaisCAS =
+          atualizarCorrecoes;
+
+
+        /* ======================================================
+           BOTÕES CAS
+        ====================================================== */
+
+        document
+          .querySelectorAll(
+            ".cas-btn"
+          )
+          .forEach(
+            function(btn){
+
+              btn.addEventListener(
+                "click",
+                function(){
+
+                  setTimeout(
+                    atualizarCorrecoes,
+                    30
+                  );
+
+                }
+              );
+
+            }
+          );
+
+
+        /* ======================================================
+           INTEGRA COM O CHECKBOX
+           "TERRITÓRIOS DAS CAS"
+        ====================================================== */
+
+        const checkbox =
+          document.getElementById(
+            "toggleTerritoriosCASReal"
+          );
+
+
+        if(checkbox){
+
+          checkbox.addEventListener(
+            "change",
+            function(){
+
+              if(
+                this.checked
+              ){
+
+                if(
+                  !map.hasLayer(
+                    grupoCorrecoes
+                  )
+                ){
+
+                  grupoCorrecoes.addTo(
+                    map
+                  );
+
+                }
+
+
+                atualizarCorrecoes();
+
+              }
+
+              else{
+
+                if(
+                  map.hasLayer(
+                    grupoCorrecoes
+                  )
+                ){
+
+                  map.removeLayer(
+                    grupoCorrecoes
+                  );
+
+                }
+
+              }
+
+            }
+          );
+
+        }
+
+
+        /* ======================================================
+           DIAGNÓSTICO
+        ====================================================== */
+
+        console.group(
+          "CORREÇÃO DOS 3 BAIRROS"
+        );
+
+
+        corrigidos.forEach(
+          function(feature){
+
+            console.log(
+
+              feature.properties.nome,
+
+              "→",
+
+              feature.properties.cas_correcao
+
+            );
+
+          }
+        );
+
+
+        console.log(
+          "Total corrigido:",
+          corrigidos.length
+        );
+
+
+        console.groupEnd();
+
+
+        /* ======================================================
+           APLICA ESTADO INICIAL
+        ====================================================== */
+
+        atualizarCorrecoes();
+
+      })
+
+
+      .catch(function(erro){
+
+        console.error(
+          "Erro na correção territorial:",
+          erro
+        );
+
+      });
+
+  }
+
+
+  /* ============================================================
+     EXECUÇÃO
+  ============================================================ */
+
+  if(
+    document.readyState ===
+    "loading"
+  ){
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      iniciarCorrecao
+    );
+
+  }
+
+  else{
+
+    iniciarCorrecao();
+
+  }
+
+})();
+</script>
