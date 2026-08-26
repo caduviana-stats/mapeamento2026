@@ -2194,362 +2194,789 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 })();
 </script>
 
-
-<!-- =========================================================
-TERRITÓRIOS DAS CAS — VERSÃO CORRIGIDA
-COLE NO FINAL DO HTML
-========================================================= -->
+<!-- ============================================================
+     TERRITÓRIOS DAS CAS — MALHA OFICIAL DE BAIRROS
+     Prefeitura do Rio / Instituto Pereira Passos
+     Cole este bloco no FINAL do HTML
+=============================================================== -->
 
 <style>
-.cas-territorio-label{
-  background:rgba(255,255,255,.88) !important;
-  border:1px solid #cbd5e1 !important;
-  border-radius:999px !important;
-  box-shadow:0 2px 8px rgba(15,23,42,.10) !important;
-  color:#0f172a !important;
-  font-size:11px !important;
-  font-weight:800 !important;
-  padding:3px 7px !important;
+
+.cas-area-loading{
+  position:absolute;
+  z-index:1200;
+  right:18px;
+  bottom:58px;
+  background:rgba(255,255,255,.96);
+  border:1px solid #e5e7eb;
+  border-radius:999px;
+  padding:8px 13px;
+  font-size:11px;
+  color:#475569;
+  box-shadow:0 6px 18px rgba(15,23,42,.10);
 }
 
-.cas-territorio-label:before{
+.cas-area-error{
+  color:#b91c1c;
+}
+
+.cas-area-label{
+  background:rgba(255,255,255,.88) !important;
+  color:#0f172a !important;
+  border:1px solid rgba(100,116,139,.32) !important;
+  border-radius:999px !important;
+  box-shadow:0 2px 7px rgba(15,23,42,.08) !important;
+  font-size:10px !important;
+  font-weight:700 !important;
+  padding:2px 6px !important;
+}
+
+.cas-area-label:before{
   display:none !important;
 }
+
 </style>
 
+
 <script>
-(function(){
+(async function(){
 
-  if (window.__CAS_AREAS_CORRIGIDAS__) return;
-  window.__CAS_AREAS_CORRIGIDAS__ = true;
+  /* ============================================================
+     EVITA DUPLICIDADE
+  ============================================================ */
 
-  if (typeof map === 'undefined' || typeof L === 'undefined') {
-    console.error('Mapa Leaflet não encontrado.');
+  if(window.__CAS_MALHA_OFICIAL__){
+    console.warn('A camada territorial das CAS já foi carregada.');
     return;
   }
 
-  /* =====================================================
-     1. CRIA UM PANE EXCLUSIVO PARA AS ÁREAS
-  ===================================================== */
+  window.__CAS_MALHA_OFICIAL__ = true;
 
-  if (!map.getPane('casAreasPane')) {
-    map.createPane('casAreasPane');
+
+  /* ============================================================
+     VERIFICA MAPA
+  ============================================================ */
+
+  if(typeof L === 'undefined' || typeof map === 'undefined'){
+    console.error('Leaflet ou mapa principal não encontrados.');
+    return;
   }
 
-  const pane = map.getPane('casAreasPane');
 
-  /*
-    Tile layer geralmente fica em torno de z-index 200.
-    Marcadores ficam acima de 400.
-    Então usamos 250.
-  */
-  pane.style.zIndex = 250;
-  pane.style.pointerEvents = 'none';
+  /* ============================================================
+     PANE ESPECÍFICO
+
+     tilePane     = 200
+     CAS          = 260
+     overlays     = 400
+     markers      = 600+
+
+     Assim os territórios ficam ENTRE o mapa-base e os pontos.
+  ============================================================ */
+
+  if(!map.getPane('casTerritoryPane')){
+    map.createPane('casTerritoryPane');
+  }
+
+  map.getPane('casTerritoryPane').style.zIndex = 260;
+  map.getPane('casTerritoryPane').style.pointerEvents = 'none';
 
 
-  /* =====================================================
-     2. CORES
-  ===================================================== */
+  /* ============================================================
+     CORES
 
-  const CAS_AREA_COLORS = {
-    '1ª CAS':  '#E8E6A4',
-    '2ª CAS':  '#DCE9E7',
-    '3ª CAS':  '#DCE8AE',
-    '4ª CAS':  '#D9AAA2',
-    '5ª CAS':  '#D8BE57',
-    '6ª CAS':  '#C9B9C6',
-    '7ª CAS':  '#917B91',
-    '8ª CAS':  '#9C99A1',
-    '9ª CAS':  '#DDE9A6',
-    '10ª CAS': '#91B19A'
+     Inspiradas no mapa físico da SMAS.
+  ============================================================ */
+
+  const CAS_TERRITORY_COLORS = {
+
+    '1ª CAS':'#E7E49B',
+
+    '2ª CAS':'#D7E4E2',
+
+    '3ª CAS':'#DDE5AD',
+
+    '4ª CAS':'#D5A49C',
+
+    '5ª CAS':'#D1B64C',
+
+    '6ª CAS':'#C4B5C4',
+
+    '7ª CAS':'#8C788A',
+
+    '8ª CAS':'#96939A',
+
+    '9ª CAS':'#D8E59A',
+
+    '10ª CAS':'#88A991'
+
   };
 
 
-  /* =====================================================
-     3. POLÍGONOS APROXIMADOS
-  ===================================================== */
+  /* ============================================================
+     NORMALIZAÇÃO
 
-  const CAS_AREAS = [
+     Remove acentos e diferenças simples de grafia.
+  ============================================================ */
 
-    {
-      cas:'1ª CAS',
-      coords:[
-        [-22.873,-43.235],
-        [-22.870,-43.213],
-        [-22.879,-43.190],
-        [-22.888,-43.168],
-        [-22.901,-43.158],
-        [-22.919,-43.164],
-        [-22.932,-43.181],
-        [-22.931,-43.203],
-        [-22.920,-43.219],
-        [-22.904,-43.229],
-        [-22.888,-43.237]
-      ]
-    },
+  function normalizarNome(valor){
 
-    {
-      cas:'2ª CAS',
-      coords:[
-        [-22.903,-43.268],
-        [-22.905,-43.239],
-        [-22.919,-43.218],
-        [-22.930,-43.201],
-        [-22.941,-43.184],
-        [-22.958,-43.172],
-        [-22.978,-43.170],
-        [-22.993,-43.182],
-        [-23.008,-43.205],
-        [-23.015,-43.233],
-        [-23.011,-43.264],
-        [-22.997,-43.286],
-        [-22.978,-43.297],
-        [-22.952,-43.298],
-        [-22.929,-43.288],
-        [-22.913,-43.278]
-      ]
-    },
+    return String(valor || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g,'')
+      .replace(/[–—]/g,'-')
+      .replace(/\s+/g,' ')
+      .trim()
+      .toUpperCase();
 
-    {
-      cas:'3ª CAS',
-      coords:[
-        [-22.855,-43.323],
-        [-22.850,-43.292],
-        [-22.858,-43.263],
-        [-22.875,-43.244],
-        [-22.897,-43.246],
-        [-22.917,-43.261],
-        [-22.926,-43.283],
-        [-22.918,-43.313],
-        [-22.900,-43.329],
-        [-22.875,-43.332]
-      ]
-    },
-
-    {
-      cas:'4ª CAS',
-      coords:[
-        [-22.770,-43.210],
-        [-22.760,-43.178],
-        [-22.777,-43.156],
-        [-22.806,-43.163],
-        [-22.823,-43.190],
-        [-22.838,-43.219],
-        [-22.855,-43.249],
-        [-22.862,-43.280],
-        [-22.848,-43.307],
-        [-22.823,-43.312],
-        [-22.800,-43.290],
-        [-22.785,-43.258]
-      ]
-    },
-
-    {
-      cas:'5ª CAS',
-      coords:[
-        [-22.832,-43.390],
-        [-22.824,-43.355],
-        [-22.832,-43.323],
-        [-22.849,-43.311],
-        [-22.871,-43.317],
-        [-22.891,-43.337],
-        [-22.899,-43.368],
-        [-22.888,-43.397],
-        [-22.861,-43.404],
-        [-22.842,-43.397]
-      ]
-    },
-
-    {
-      cas:'6ª CAS',
-      coords:[
-        [-22.776,-43.386],
-        [-22.773,-43.346],
-        [-22.785,-43.313],
-        [-22.807,-43.303],
-        [-22.833,-43.310],
-        [-22.849,-43.333],
-        [-22.850,-43.369],
-        [-22.839,-43.400],
-        [-22.814,-43.408],
-        [-22.790,-43.400]
-      ]
-    },
-
-    {
-      cas:'7ª CAS',
-      coords:[
-        [-22.883,-43.409],
-        [-22.879,-43.372],
-        [-22.892,-43.343],
-        [-22.919,-43.324],
-        [-22.950,-43.317],
-        [-22.982,-43.323],
-        [-23.011,-43.346],
-        [-23.031,-43.384],
-        [-23.041,-43.431],
-        [-23.038,-43.477],
-        [-23.018,-43.510],
-        [-22.990,-43.519],
-        [-22.958,-43.500],
-        [-22.928,-43.471],
-        [-22.902,-43.444]
-      ]
-    },
-
-    {
-      cas:'8ª CAS',
-      coords:[
-        [-22.818,-43.486],
-        [-22.818,-43.446],
-        [-22.833,-43.414],
-        [-22.857,-43.399],
-        [-22.886,-43.405],
-        [-22.909,-43.431],
-        [-22.919,-43.469],
-        [-22.912,-43.507],
-        [-22.890,-43.529],
-        [-22.857,-43.531],
-        [-22.830,-43.513]
-      ]
-    },
-
-    {
-      cas:'9ª CAS',
-      coords:[
-        [-22.839,-43.612],
-        [-22.834,-43.569],
-        [-22.843,-43.529],
-        [-22.862,-43.506],
-        [-22.887,-43.512],
-        [-22.910,-43.532],
-        [-22.931,-43.561],
-        [-22.945,-43.597],
-        [-22.936,-43.628],
-        [-22.910,-43.643],
-        [-22.877,-43.637],
-        [-22.851,-43.624]
-      ]
-    },
-
-    {
-      cas:'10ª CAS',
-      coords:[
-        [-22.813,-43.748],
-        [-22.808,-43.699],
-        [-22.819,-43.646],
-        [-22.841,-43.608],
-        [-22.872,-43.600],
-        [-22.905,-43.617],
-        [-22.934,-43.640],
-        [-22.965,-43.657],
-        [-22.998,-43.664],
-        [-23.023,-43.687],
-        [-23.036,-43.720],
-        [-23.024,-43.756],
-        [-22.997,-43.784],
-        [-22.960,-43.802],
-        [-22.916,-43.804],
-        [-22.875,-43.789],
-        [-22.840,-43.767]
-      ]
-    }
-
-  ];
+  }
 
 
-  /* =====================================================
-     4. CRIA CAMADAS
-  ===================================================== */
+  /* ============================================================
+     ABRANGÊNCIA DAS CAS
 
-  const casAreaGroup = L.layerGroup().addTo(map);
-  window.casAreaGroup = casAreaGroup;
+     Baseada na relação de bairros divulgada pela SMAS.
 
-  const casAreaLayers = [];
+     IMPORTANTE:
+     Nos bairros oficialmente indicados como "parte", a malha
+     de bairros não contém a subdivisão interna da CAS.
+     Nesses poucos casos adotamos uma CAS principal.
+  ============================================================ */
+
+  const BAIRROS_POR_CAS = {
 
 
-  CAS_AREAS.forEach(function(area){
+    /* ==========================
+       1ª CAS
+    ========================== */
 
-    const polygon = L.polygon(area.coords, {
+    '1ª CAS':[
 
-      pane:'casAreasPane',
+      'Benfica',
+      'Caju',
+      'Catumbi',
+      'Centro',
+      'Cidade Nova',
+      'Estácio',
+      'Gamboa',
+      'Mangueira',
+      'Paquetá',
+      'Rio Comprido',
+      'Santa Teresa',
+      'Santo Cristo',
+      'São Cristóvão',
+      'Saúde',
+      'Vasco da Gama'
 
-      color:'#475569',
+    ],
 
-      weight:1,
 
-      opacity:.55,
+    /* ==========================
+       2ª CAS
+    ========================== */
 
-      fillColor:CAS_AREA_COLORS[area.cas],
+    '2ª CAS':[
 
-      fillOpacity:.20,
+      'Alto da Boa Vista',
+      'Andaraí',
+      'Botafogo',
+      'Catete',
+      'Copacabana',
+      'Cosme Velho',
+      'Flamengo',
+      'Gávea',
+      'Glória',
+      'Grajaú',
+      'Humaitá',
+      'Ipanema',
+      'Jardim Botânico',
+      'Lagoa',
+      'Laranjeiras',
+      'Leblon',
+      'Leme',
+      'Maracanã',
+      'Praça da Bandeira',
+      'Rocinha',
+      'São Conrado',
+      'Tijuca',
+      'Urca',
+      'Vidigal',
+      'Vila Isabel'
 
-      interactive:false
+    ],
+
+
+    /* ==========================
+       3ª CAS
+    ========================== */
+
+    '3ª CAS':[
+
+      'Abolição',
+      'Água Santa',
+      'Cachambi',
+      'Del Castilho',
+      'Encantado',
+      'Engenho da Rainha',
+      'Engenho de Dentro',
+      'Engenho Novo',
+      'Higienópolis',
+      'Inhaúma',
+      'Jacaré',
+      'Jacarezinho',
+      'Lins de Vasconcelos',
+      'Maria da Graça',
+      'Méier',
+      'Piedade',
+      'Pilares',
+      'Riachuelo',
+      'Rocha',
+      'Sampaio',
+      'São Francisco Xavier',
+      'Todos os Santos',
+      'Tomás Coelho'
+
+    ],
+
+
+    /* ==========================
+       4ª CAS
+    ========================== */
+
+    '4ª CAS':[
+
+      'Bancários',
+      'Bonsucesso',
+      'Brás de Pina',
+      'Cacuia',
+      'Cidade Universitária',
+      'Cocotá',
+      'Complexo do Alemão',
+      'Cordovil',
+      'Freguesia',
+      'Galeão',
+      'Jardim América',
+      'Jardim Carioca',
+      'Jardim Guanabara',
+      'Manguinhos',
+      'Maré',
+      'Moneró',
+      'Olaria',
+      'Parada de Lucas',
+      'Penha',
+      'Penha Circular',
+      'Pitangueiras',
+      'Portuguesa',
+      'Praia da Bandeira',
+      'Ramos',
+      'Ribeira',
+      'Tauá',
+      'Vigário Geral',
+      'Zumbi'
+
+    ],
+
+
+    /* ==========================
+       5ª CAS
+    ========================== */
+
+    '5ª CAS':[
+
+      'Bento Ribeiro',
+      'Campinho',
+      'Cascadura',
+      'Cavalcanti',
+      'Coelho Neto',
+      'Engenheiro Leal',
+      'Guadalupe',
+      'Honório Gurgel',
+      'Madureira',
+      'Marechal Hermes',
+      'Oswaldo Cruz',
+      'Parque Anchieta',
+      'Quintino Bocaiúva',
+      'Ricardo de Albuquerque',
+      'Rocha Miranda',
+      'Turiaçu',
+      'Vaz Lobo'
+
+    ],
+
+
+    /* ==========================
+       6ª CAS
+    ========================== */
+
+    '6ª CAS':[
+
+      'Acari',
+      'Anchieta',
+      'Barros Filho',
+      'Colégio',
+      'Costa Barros',
+      'Irajá',
+      'Parque Colúmbia',
+      'Pavuna',
+      'Vicente de Carvalho',
+      'Vila da Penha',
+      'Vila Kosmos',
+      'Vista Alegre'
+
+    ],
+
+
+    /* ==========================
+       7ª CAS
+    ========================== */
+
+    '7ª CAS':[
+
+      'Anil',
+      'Barra da Tijuca',
+      'Camorim',
+      'Cidade de Deus',
+      'Curicica',
+      'Freguesia (Jacarepaguá)',
+      'Gardênia Azul',
+      'Grumari',
+      'Itanhangá',
+      'Jacarepaguá',
+      'Joá',
+      'Pechincha',
+      'Praça Seca',
+      'Recreio dos Bandeirantes',
+      'Tanque',
+      'Taquara',
+      'Vargem Grande',
+      'Vargem Pequena',
+      'Vila Valqueire'
+
+    ],
+
+
+    /* ==========================
+       8ª CAS
+    ========================== */
+
+    '8ª CAS':[
+
+      'Bangu',
+      'Campo dos Afonsos',
+      'Deodoro',
+      'Gericinó',
+      'Jardim Sulacap',
+      'Magalhães Bastos',
+      'Padre Miguel',
+      'Realengo',
+      'Senador Camará',
+      'Vila Militar'
+
+    ],
+
+
+    /* ==========================
+       9ª CAS
+    ========================== */
+
+    '9ª CAS':[
+
+      'Campo Grande',
+      'Cosmos',
+      'Inhoaíba',
+      'Santíssimo',
+      'Senador Vasconcelos'
+
+    ],
+
+
+    /* ==========================
+       10ª CAS
+    ========================== */
+
+    '10ª CAS':[
+
+      'Barra de Guaratiba',
+      'Guaratiba',
+      'Paciência',
+      'Pedra de Guaratiba',
+      'Santa Cruz',
+      'Sepetiba'
+
+    ]
+
+  };
+
+
+  /* ============================================================
+     CORREÇÕES DE NOMES
+
+     Alguns nomes utilizados administrativamente pela SMAS
+     podem diferir ligeiramente dos nomes da malha cartográfica.
+  ============================================================ */
+
+  const ALIASES = {
+
+    'CAMPO DOS AFONSO':'CAMPO DOS AFONSOS',
+
+    'PARQUE COLUMBIA':'PARQUE COLUMBIA',
+
+    'VINCENTE DE CARVALHO':'VICENTE DE CARVALHO',
+
+    'ITANHAGA':'ITANHANGA',
+
+    'FREGUESIA (ILHA DO GOVERNADOR)':'FREGUESIA',
+
+    'FREGUESIA (JACAREPAGUA)':'FREGUESIA (JACAREPAGUA)'
+
+  };
+
+
+  function corrigirNome(nome){
+
+    const n = normalizarNome(nome);
+
+    return ALIASES[n] || n;
+
+  }
+
+
+  /* ============================================================
+     CRIA ÍNDICE BAIRRO -> CAS
+  ============================================================ */
+
+  const CAS_POR_BAIRRO = {};
+
+
+  Object.entries(BAIRROS_POR_CAS).forEach(function([cas,bairros]){
+
+    bairros.forEach(function(bairro){
+
+      CAS_POR_BAIRRO[corrigirNome(bairro)] = cas;
 
     });
-
-    polygon._cas = area.cas;
-
-    polygon.addTo(casAreaGroup);
-
-    casAreaLayers.push(polygon);
 
   });
 
 
-  /* =====================================================
-     5. FUNÇÃO PARA IDENTIFICAR CAS ATIVA
-  ===================================================== */
+  /* ============================================================
+     CASOS ESPECIAIS
 
-  function casAtiva(){
+     O nome simples "Freguesia" existe em dois territórios:
+     Ilha do Governador e Jacarepaguá.
 
-    const btn = document.querySelector('.cas-btn.active');
+     A malha oficial traz informação de Região Administrativa,
+     que utilizamos para diferenciá-los.
+  ============================================================ */
 
-    return btn ? btn.textContent.trim() : 'TODAS';
+  function detectarCAS(feature){
+
+    const p = feature.properties || {};
+
+    let nome = corrigirNome(
+      p.nome ||
+      p.NOME ||
+      p.Name ||
+      ''
+    );
+
+    const regiao = normalizarNome(
+      p.regiao_adm ||
+      p.REGIAO_ADM ||
+      ''
+    );
+
+
+    /* --------------------------------------
+       FREGUESIA DA ILHA
+    -------------------------------------- */
+
+    if(nome === 'FREGUESIA'){
+
+      if(
+        regiao.includes('ILHA') ||
+        regiao.includes('GOVERNADOR')
+      ){
+        return '4ª CAS';
+      }
+
+      return '7ª CAS';
+
+    }
+
+
+    /* --------------------------------------
+       GUARATIBA
+    -------------------------------------- */
+
+    if(nome === 'ILHA DE GUARATIBA'){
+      return '10ª CAS';
+    }
+
+
+    return CAS_POR_BAIRRO[nome] || null;
 
   }
 
 
-  /* =====================================================
-     6. ATUALIZA DESTAQUE
-  ===================================================== */
+  /* ============================================================
+     GRUPO TERRITORIAL
+  ============================================================ */
 
-  function atualizarAreasCAS(){
+  const grupoCAS = L.layerGroup();
 
-    const ativa = casAtiva();
+  window.grupoTerritoriosCAS = grupoCAS;
 
-    casAreaLayers.forEach(function(poly){
 
-      const selecionada = poly._cas === ativa;
+  /* ============================================================
+     STATUS NA TELA
+  ============================================================ */
 
-      if (ativa === 'TODAS') {
+  const aviso = document.createElement('div');
 
-        poly.setStyle({
-          color:'#475569',
-          weight:1,
-          opacity:.55,
-          fillColor:CAS_AREA_COLORS[poly._cas],
-          fillOpacity:.20
+  aviso.className = 'cas-area-loading';
+
+  aviso.textContent = 'Carregando limites oficiais das CAS…';
+
+  document.body.appendChild(aviso);
+
+
+  /* ============================================================
+     SERVIÇO OFICIAL
+
+     Prefeitura do Rio / Instituto Pereira Passos
+     Camada 4 = Limite de Bairros
+     outSR 4326 = latitude/longitude
+  ============================================================ */
+
+  const URL_BAIRROS =
+
+    'https://pgeo3.rio.rj.gov.br/arcgis/rest/services/' +
+
+    'Cartografia/Limites_administrativos/FeatureServer/4/query' +
+
+    '?where=1%3D1' +
+
+    '&outFields=nome%2Cregiao_adm%2Ccodbairro' +
+
+    '&returnGeometry=true' +
+
+    '&outSR=4326' +
+
+    '&f=geojson';
+
+
+  let geojson;
+
+
+  try{
+
+    const resposta = await fetch(URL_BAIRROS);
+
+    if(!resposta.ok){
+      throw new Error(
+        'HTTP ' + resposta.status
+      );
+    }
+
+    geojson = await resposta.json();
+
+  }
+
+  catch(error){
+
+    console.error(
+      'Não foi possível carregar a malha oficial:',
+      error
+    );
+
+    aviso.textContent =
+      'Não foi possível carregar os territórios das CAS.';
+
+    aviso.classList.add('cas-area-error');
+
+    setTimeout(function(){
+      aviso.remove();
+    },5000);
+
+    return;
+
+  }
+
+
+  /* ============================================================
+     FILTRA SOMENTE BAIRROS ASSOCIADOS ÀS CAS
+  ============================================================ */
+
+  const featuresCAS = [];
+
+
+  (geojson.features || []).forEach(function(feature){
+
+    const cas = detectarCAS(feature);
+
+    if(!cas){
+      return;
+    }
+
+    feature.properties.cas_smas = cas;
+
+    featuresCAS.push(feature);
+
+  });
+
+
+  /* ============================================================
+     ESTILO INICIAL
+  ============================================================ */
+
+  function estiloPadrao(feature){
+
+    const cas = feature.properties.cas_smas;
+
+    return {
+
+      pane:'casTerritoryPane',
+
+      color:'#64748b',
+
+      weight:0.7,
+
+      opacity:.45,
+
+      fillColor:CAS_TERRITORY_COLORS[cas],
+
+      fillOpacity:.24
+
+    };
+
+  }
+
+
+  /* ============================================================
+     CRIA GEOJSON
+  ============================================================ */
+
+  const camadaGeoCAS = L.geoJSON(
+    {
+      type:'FeatureCollection',
+      features:featuresCAS
+    },
+    {
+
+      pane:'casTerritoryPane',
+
+      style:estiloPadrao,
+
+      interactive:false
+
+    }
+  );
+
+
+  camadaGeoCAS.addTo(grupoCAS);
+
+  grupoCAS.addTo(map);
+
+  window.camadaGeoCAS = camadaGeoCAS;
+
+
+  /* ============================================================
+     SELEÇÃO DA CAS
+  ============================================================ */
+
+  function obterCasSelecionada(){
+
+    const ativo = document.querySelector(
+      '.cas-btn.active'
+    );
+
+    if(!ativo){
+      return 'TODAS';
+    }
+
+    return ativo.textContent.trim();
+
+  }
+
+
+  /* ============================================================
+     ATUALIZA VISUAL
+  ============================================================ */
+
+  function atualizarVisualCAS(){
+
+    const selecionada =
+      obterCasSelecionada();
+
+
+    camadaGeoCAS.eachLayer(function(layer){
+
+      const cas =
+        layer.feature.properties.cas_smas;
+
+
+      /* TODAS */
+
+      if(selecionada === 'TODAS'){
+
+        layer.setStyle({
+
+          color:'#64748b',
+
+          weight:.7,
+
+          opacity:.45,
+
+          fillColor:
+            CAS_TERRITORY_COLORS[cas],
+
+          fillOpacity:.24
+
         });
 
-      } else if (selecionada) {
+      }
 
-        poly.setStyle({
-          color:'#0f172a',
-          weight:2.5,
-          opacity:.95,
-          fillColor:CAS_AREA_COLORS[poly._cas],
-          fillOpacity:.40
+
+      /* CAS SELECIONADA */
+
+      else if(cas === selecionada){
+
+        layer.setStyle({
+
+          color:'#334155',
+
+          weight:1.4,
+
+          opacity:.8,
+
+          fillColor:
+            CAS_TERRITORY_COLORS[cas],
+
+          fillOpacity:.39
+
         });
 
-      } else {
+      }
 
-        poly.setStyle({
-          color:'#cbd5e1',
-          weight:.5,
-          opacity:.20,
-          fillColor:CAS_AREA_COLORS[poly._cas],
-          fillOpacity:.035
+
+      /* DEMAIS */
+
+      else{
+
+        layer.setStyle({
+
+          color:'#94a3b8',
+
+          weight:.35,
+
+          opacity:.10,
+
+          fillColor:
+            CAS_TERRITORY_COLORS[cas],
+
+          fillOpacity:.025
+
         });
 
       }
@@ -2559,70 +2986,184 @@ COLE NO FINAL DO HTML
   }
 
 
-  /* =====================================================
-     7. INTEGRA COM OS BOTÕES EXISTENTES
-  ===================================================== */
+  /* ============================================================
+     BOTÕES CAS EXISTENTES
+  ============================================================ */
 
-  document.querySelectorAll('.cas-btn').forEach(function(btn){
+  document
+    .querySelectorAll('.cas-btn')
+    .forEach(function(btn){
 
-    btn.addEventListener('click', function(){
+      btn.addEventListener(
+        'click',
+        function(){
 
-      setTimeout(atualizarAreasCAS, 0);
+          setTimeout(
+            atualizarVisualCAS,
+            10
+          );
+
+        }
+      );
 
     });
 
-  });
+
+  /* ============================================================
+     CHECKBOX
+
+     Não usa data-type porque isso faria o seu applyFilters()
+     tentar tratar a camada territorial como equipamento.
+  ============================================================ */
+
+  const primeiraSecao =
+    document.querySelector(
+      '.sidebar .section'
+    );
 
 
-  /* =====================================================
-     8. CRIA BOTÃO NO MENU
-  ===================================================== */
+  if(
+    primeiraSecao &&
+    !document.getElementById(
+      'toggleTerritoriosCASOficial'
+    )
+  ){
 
-  const secao = document.querySelector('.sidebar .section');
+    const linha =
+      document.createElement('div');
 
-  if (secao && !document.getElementById('toggleCasAreas')) {
-
-    const linha = document.createElement('div');
 
     linha.className = 'check';
 
+
     linha.innerHTML =
+
       '<label>' +
-      '<input type="checkbox" id="toggleCasAreas" checked>' +
-      '<span><i class="dot" style="background:#94a3b8"></i> Territórios das CAS</span>' +
+
+        '<input ' +
+          'type="checkbox" ' +
+          'id="toggleTerritoriosCASOficial" ' +
+          'checked' +
+        '>' +
+
+        '<span>' +
+
+          '<i class="dot" ' +
+          'style="background:#94A3B8">' +
+          '</i> ' +
+
+          'Territórios das CAS' +
+
+        '</span>' +
+
       '</label>';
 
-    secao.appendChild(linha);
+
+    primeiraSecao.appendChild(
+      linha
+    );
+
 
     document
-      .getElementById('toggleCasAreas')
-      .addEventListener('change', function(){
+      .getElementById(
+        'toggleTerritoriosCASOficial'
+      )
+      .addEventListener(
+        'change',
+        function(){
 
-        if (this.checked) {
+          if(this.checked){
 
-          if (!map.hasLayer(casAreaGroup)) {
-            casAreaGroup.addTo(map);
+            if(
+              !map.hasLayer(grupoCAS)
+            ){
+
+              grupoCAS.addTo(map);
+
+            }
+
+            atualizarVisualCAS();
+
           }
 
-          atualizarAreasCAS();
+          else{
 
-        } else {
+            if(
+              map.hasLayer(grupoCAS)
+            ){
 
-          if (map.hasLayer(casAreaGroup)) {
-            map.removeLayer(casAreaGroup);
+              map.removeLayer(
+                grupoCAS
+              );
+
+            }
+
           }
 
         }
-
-      });
+      );
 
   }
 
 
-  atualizarAreasCAS();
+  /* ============================================================
+     NÃO ALTERA ZOOM
 
-  console.log('Áreas CAS carregadas corretamente.');
+     A camada simplesmente aparece na posição atual.
+  ============================================================ */
+
+  atualizarVisualCAS();
+
+
+  /* ============================================================
+     REMOVE AVISO
+  ============================================================ */
+
+  aviso.textContent =
+    'Limites territoriais carregados';
+
+
+  setTimeout(function(){
+
+    aviso.remove();
+
+  },1800);
+
+
+  /* ============================================================
+     LOG DE DIAGNÓSTICO
+  ============================================================ */
+
+  console.log(
+    'Territórios CAS:',
+    featuresCAS.length,
+    'bairros oficiais carregados.'
+  );
+
+
+  /* Mostra bairros da malha que não foram classificados.
+     Útil apenas para conferência no console. */
+
+  const naoClassificados = [];
+
+  (geojson.features || []).forEach(function(feature){
+
+    if(!detectarCAS(feature)){
+
+      naoClassificados.push(
+        feature.properties.nome
+      );
+
+    }
+
+  });
+
+
+  console.log(
+    'Bairros não associados a uma CAS:',
+    naoClassificados
+  );
+
 
 })();
 </script>
-
