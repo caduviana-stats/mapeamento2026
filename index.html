@@ -3498,47 +3498,43 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 
 <!-- ============================================================
-     PATCH FINAL — PREENCHIMENTO DOS 5 BURACOS DAS CAS
+     PATCH LIMPO DOS 5 BURACOS TERRITORIAIS
 
-     São Cristóvão             -> 1ª CAS
-     Oswaldo Cruz              -> 5ª CAS
-     Freguesia (Jacarepaguá)   -> 7ª CAS
-     Barra Olímpica            -> 7ª CAS
-     Vila Kennedy              -> 8ª CAS
+     São Cristóvão           -> 1ª CAS
+     Oswaldo Cruz            -> 5ª CAS
+     Freguesia/Jacarepaguá   -> 7ª CAS
+     Barra Olímpica          -> 7ª CAS
+     Vila Kennedy            -> 8ª CAS
 
-     COLE APÓS O SCRIPT TERRITORIAL QUE JÁ FUNCIONA
+     SEM BORDA.
+     SEM TURF.
+     SEM UNION.
+     APENAS PREENCHIMENTO.
 =============================================================== -->
 
 <script>
-(function () {
+(function(){
 
-  if (window.__PATCH_5_BAIRROS_CAS_FINAL__) {
-    return;
-  }
-
-  window.__PATCH_5_BAIRROS_CAS_FINAL__ = true;
+  if(window.__PATCH_LIMPO_CAS_V1__) return;
+  window.__PATCH_LIMPO_CAS_V1__ = true;
 
 
-  /* ============================================================
-     1. AGUARDA LEAFLET E MAPA
-  ============================================================ */
+  function iniciar(){
 
-  function iniciarPatchCAS() {
-
-    if (
+    if(
       typeof L === "undefined" ||
       typeof map === "undefined"
-    ) {
-      setTimeout(iniciarPatchCAS, 300);
+    ){
+      setTimeout(iniciar, 300);
       return;
     }
 
 
-    /* ============================================================
-       2. CORES — IGUAIS À CAMADA PRINCIPAL
-    ============================================================ */
+    /* =========================================================
+       1. CORES IDÊNTICAS À CAMADA PRINCIPAL
+    ========================================================= */
 
-    const CORES_PATCH = {
+    const CORES = {
 
       "1ª CAS": "#EEE99A",
 
@@ -3551,43 +3547,15 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
     };
 
 
-    /* ============================================================
-       3. PANE EXCLUSIVO DO PATCH
+    /* =========================================================
+       2. NORMALIZAÇÃO
+    ========================================================= */
 
-       A camada principal usa aproximadamente 260.
-       Este patch fica em 280, portanto aparece POR CIMA dela,
-       mas continua abaixo dos equipamentos.
-    ============================================================ */
+    function normalizar(v){
 
-    if (!map.getPane("patchBuracosCASPane")) {
-
-      map.createPane(
-        "patchBuracosCASPane"
-      );
-
-    }
-
-    const pane =
-      map.getPane(
-        "patchBuracosCASPane"
-      );
-
-    pane.style.zIndex = 280;
-
-    pane.style.pointerEvents =
-      "none";
-
-
-    /* ============================================================
-       4. NORMALIZAÇÃO
-    ============================================================ */
-
-    function normalizar(valor) {
-
-      return String(valor || "")
+      return String(v || "")
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[–—]/g, "-")
         .replace(/\s+/g, " ")
         .trim()
         .toUpperCase();
@@ -3595,37 +3563,37 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
     }
 
 
-    /* ============================================================
-       5. TRANSFORMA TODOS OS ATRIBUTOS DA FEATURE EM TEXTO
+    /* =========================================================
+       3. PANE
 
-       Isto deixa o patch robusto mesmo que a Prefeitura utilize
-       nome, regiao_adm ou outro campo para identificar a área.
-    ============================================================ */
+       Mesmo nível visual dos territórios,
+       mas ligeiramente acima para preencher os buracos.
+    ========================================================= */
 
-    function textoFeature(feature) {
+    if(!map.getPane("patchFillCASPane")){
 
-      const props =
-        feature.properties || {};
-
-      return normalizar(
-
-        Object.values(props)
-          .filter(function (v) {
-            return v !== null &&
-                   v !== undefined;
-          })
-          .join(" | ")
-
+      map.createPane(
+        "patchFillCASPane"
       );
 
     }
 
+    const pane =
+      map.getPane(
+        "patchFillCASPane"
+      );
 
-    /* ============================================================
-       6. IDENTIFICA EXATAMENTE AS 5 ÁREAS
-    ============================================================ */
+    pane.style.zIndex = 265;
 
-    function identificarPatch(feature) {
+    pane.style.pointerEvents =
+      "none";
+
+
+    /* =========================================================
+       4. REGRA EXATA
+    ========================================================= */
+
+    function obterCAS(feature){
 
       const p =
         feature.properties || {};
@@ -3634,128 +3602,93 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
         normalizar(
           p.nome ||
           p.NOME ||
-          p.bairro ||
-          p.BAIRRO ||
           ""
         );
 
-      const ra =
-        normalizar(
-          p.regiao_adm ||
-          p.REGIAO_ADM ||
-          p.ra ||
-          p.RA ||
-          ""
-        );
 
-      const tudo =
-        textoFeature(feature);
+      /* =======================================================
+         SÃO CRISTÓVÃO
+      ======================================================= */
 
-
-      /* ========================================================
-         SÃO CRISTÓVÃO -> 1ª CAS
-
-         Aceita:
-         São Cristóvão
-         Imperial de São Cristóvão
-      ======================================================== */
-
-      if (
-        nome.includes("SAO CRISTOVAO") ||
-        tudo.includes("SAO CRISTOVAO")
-      ) {
-
+      if(
+        nome === "SAO CRISTOVAO" ||
+        nome === "IMPERIAL DE SAO CRISTOVAO"
+      ){
         return "1ª CAS";
-
       }
 
 
-      /* ========================================================
-         OSWALDO CRUZ -> 5ª CAS
-      ======================================================== */
+      /* =======================================================
+         OSWALDO CRUZ
+      ======================================================= */
 
-      if (
-        nome.includes("OSWALDO CRUZ") ||
-        tudo.includes("OSWALDO CRUZ")
-      ) {
-
+      if(
+        nome === "OSWALDO CRUZ"
+      ){
         return "5ª CAS";
-
       }
 
 
-      /* ========================================================
-         VILA KENNEDY -> 8ª CAS
+      /* =======================================================
+         FREGUESIA DE JACAREPAGUÁ
 
-         Aceita KENNEDY e KENEDY
-      ======================================================== */
+         Aceita somente nomes explicitamente de Jacarepaguá.
+         NÃO pega a Freguesia da Ilha.
+      ======================================================= */
 
-      if (
-        nome.includes("VILA KENNEDY") ||
-        nome.includes("VILA KENEDY") ||
-        tudo.includes("VILA KENNEDY") ||
-        tudo.includes("VILA KENEDY")
-      ) {
-
-        return "8ª CAS";
-
-      }
-
-
-      /* ========================================================
-         BARRA OLÍMPICA -> 7ª CAS
-      ======================================================== */
-
-      if (
-        nome.includes("BARRA OLIMPICA") ||
-        tudo.includes("BARRA OLIMPICA")
-      ) {
-
+      if(
+        nome === "FREGUESIA (JACAREPAGUA)" ||
+        nome === "FREGUESIA DE JACAREPAGUA"
+      ){
         return "7ª CAS";
+      }
+
+
+      /*
+         Caso a camada use apenas "Freguesia",
+         checamos a Região Administrativa.
+      */
+
+      if(
+        nome === "FREGUESIA"
+      ){
+
+        const ra =
+          normalizar(
+            p.regiao_adm ||
+            p.REGIAO_ADM ||
+            ""
+          );
+
+        if(
+          ra.includes("JACAREPAGUA")
+        ){
+          return "7ª CAS";
+        }
 
       }
 
 
-      /* ========================================================
-         FREGUESIA (JACAREPAGUÁ) -> 7ª CAS
+      /* =======================================================
+         BARRA OLÍMPICA
+      ======================================================= */
 
-         É importante NÃO capturar a Freguesia
-         da Ilha do Governador.
-      ======================================================== */
-
-      if (
-        nome.includes("FREGUESIA") ||
-        tudo.includes("FREGUESIA")
-      ) {
-
-        /* Freguesia da Ilha NÃO entra no patch */
-
-        if (
-          nome.includes("ILHA DO GOVERNADOR") ||
-          ra.includes("ILHA DO GOVERNADOR") ||
-          (
-            tudo.includes("FREGUESIA") &&
-            tudo.includes("ILHA DO GOVERNADOR")
-          )
-        ) {
-
-          return null;
-
-        }
+      if(
+        nome === "BARRA OLIMPICA"
+      ){
+        return "7ª CAS";
+      }
 
 
-        /* Freguesia de Jacarepaguá */
+      /* =======================================================
+         VILA KENNEDY
+      ======================================================= */
 
-        if (
-          nome.includes("JACAREPAGUA") ||
-          ra.includes("JACAREPAGUA") ||
-          tudo.includes("JACAREPAGUA")
-        ) {
-
-          return "7ª CAS";
-
-        }
-
+      if(
+        nome === "VILA KENNEDY" ||
+        nome === "VILA KENEDY"
+      ){
+        return "8ª CAS";
       }
 
 
@@ -3764,11 +3697,11 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
     }
 
 
-    /* ============================================================
-       7. MALHA OFICIAL DE BAIRROS
-    ============================================================ */
+    /* =========================================================
+       5. URL DA MALHA OFICIAL
+    ========================================================= */
 
-    const URL_BAIRROS =
+    const URL =
 
       "https://pgeo3.rio.rj.gov.br/arcgis/rest/services/" +
 
@@ -3785,66 +3718,60 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
       "&f=geojson";
 
 
-    /* ============================================================
-       8. BUSCA TODA A MALHA
+    /* =========================================================
+       6. CARREGA
+    ========================================================= */
 
-       Não fazemos consulta por nome.
-       Isso evita problema com diferenças de nomenclatura.
-    ============================================================ */
+    fetch(URL)
 
-    fetch(URL_BAIRROS)
+      .then(function(r){
 
-      .then(function (resposta) {
-
-        if (!resposta.ok) {
+        if(!r.ok){
 
           throw new Error(
-            "Erro HTTP " +
-            resposta.status
+            "HTTP " + r.status
           );
 
         }
 
-        return resposta.json();
+        return r.json();
 
       })
 
 
-      .then(function (geojson) {
+      .then(function(data){
 
-        if (
-          !geojson ||
+        if(
+          !data ||
           !Array.isArray(
-            geojson.features
+            data.features
           )
-        ) {
+        ){
 
           throw new Error(
-            "GeoJSON inválido."
+            "GeoJSON inválido"
           );
 
         }
 
 
-        /* ======================================================
-           9. SELECIONA SOMENTE AS 5 ÁREAS
-        ====================================================== */
+        /* =====================================================
+           7. SELECIONA SOMENTE OS POLÍGONOS CORRETOS
+        ===================================================== */
 
-        const corrigidas = [];
+        const selecionados = [];
 
 
-        geojson.features.forEach(
-          function (feature) {
+        data.features.forEach(
+          function(feature){
 
             const cas =
-              identificarPatch(
+              obterCAS(
                 feature
               );
 
 
-            if (!cas) {
-              return;
-            }
+            if(!cas) return;
 
 
             const copia =
@@ -3855,17 +3782,11 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
               );
 
 
-            copia.properties =
-              Object.assign(
-                {},
-                copia.properties,
-                {
-                  cas_patch: cas
-                }
-              );
+            copia.properties.cas_patch =
+              cas;
 
 
-            corrigidas.push(
+            selecionados.push(
               copia
             );
 
@@ -3873,36 +3794,39 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
         );
 
 
-        /* ======================================================
-           10. CRIA CAMADA DO PATCH
+        /* =====================================================
+           8. CAMADA DE PREENCHIMENTO
 
-           NÃO EXISTE TURF.
-           NÃO EXISTE UNION.
-           NÃO EXISTE DISSOLVE.
+           O ponto principal:
 
-           O polígono oficial é desenhado diretamente.
-        ====================================================== */
+           stroke:false
 
-        const camadaPatch =
+           Portanto NÃO haverá:
+           - borda roxa estranha
+           - contorno amarelo em São Cristóvão
+           - linha interna entre o bairro e a CAS
+        ===================================================== */
+
+        const patch =
           L.geoJSON(
             {
               type:
                 "FeatureCollection",
 
               features:
-                corrigidas
+                selecionados
             },
             {
 
               pane:
-                "patchBuracosCASPane",
+                "patchFillCASPane",
 
               interactive:
                 false,
 
 
               style:
-                function (feature) {
+                function(feature){
 
                   const cas =
                     feature
@@ -3912,26 +3836,23 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
                   return {
 
-                    /*
-                      A borda recebe a mesma cor.
-                      Isso cobre o contorno escuro
-                      do buraco existente.
-                    */
-
-                    color:
-                      CORES_PATCH[cas],
+                    stroke:
+                      false,
 
                     weight:
-                      3,
+                      0,
 
                     opacity:
-                      1,
+                      0,
+
+                    fill:
+                      true,
 
                     fillColor:
-                      CORES_PATCH[cas],
+                      CORES[cas],
 
                     fillOpacity:
-                      .22
+                      .20
 
                   };
 
@@ -3941,26 +3862,25 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
           );
 
 
-        camadaPatch.addTo(
+        patch.addTo(
           map
         );
 
 
-        window.patchBuracosCAS =
-          camadaPatch;
+        window.patchFillCAS =
+          patch;
 
 
-        /* ======================================================
-           11. IDENTIFICA CAS SELECIONADA
-        ====================================================== */
+        /* =====================================================
+           9. FILTRO CAS
+        ===================================================== */
 
-        function obterCASAtiva() {
+        function CASAtiva(){
 
           const ativo =
             document.querySelector(
               ".cas-btn.active"
             );
-
 
           return ativo
             ? ativo.textContent.trim()
@@ -3969,18 +3889,14 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
         }
 
 
-        /* ======================================================
-           12. ATUALIZA PATCH CONFORME FILTRO
-        ====================================================== */
-
-        function atualizarPatchCAS() {
+        function atualizar(){
 
           const ativa =
-            obterCASAtiva();
+            CASAtiva();
 
 
-          camadaPatch.eachLayer(
-            function (layer) {
+          patch.eachLayer(
+            function(layer){
 
               const cas =
                 layer
@@ -3989,79 +3905,58 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
                   .cas_patch;
 
 
-              /* TODAS */
-
-              if (
+              if(
                 ativa === "TODAS"
-              ) {
+              ){
 
                 layer.setStyle({
 
-                  color:
-                    CORES_PATCH[cas],
+                  stroke:false,
 
-                  weight:
-                    3,
-
-                  opacity:
-                    1,
+                  weight:0,
 
                   fillColor:
-                    CORES_PATCH[cas],
+                    CORES[cas],
 
                   fillOpacity:
-                    .22
+                    .20
 
                 });
 
               }
 
 
-              /* CAS ATIVA */
-
-              else if (
+              else if(
                 ativa === cas
-              ) {
+              ){
 
                 layer.setStyle({
 
-                  color:
-                    CORES_PATCH[cas],
+                  stroke:false,
 
-                  weight:
-                    3,
-
-                  opacity:
-                    1,
+                  weight:0,
 
                   fillColor:
-                    CORES_PATCH[cas],
+                    CORES[cas],
 
                   fillOpacity:
-                    .36
+                    .34
 
                 });
 
               }
 
 
-              /* OUTRAS CAS */
-
-              else {
+              else{
 
                 layer.setStyle({
 
-                  color:
-                    CORES_PATCH[cas],
+                  stroke:false,
 
-                  weight:
-                    .6,
-
-                  opacity:
-                    .12,
+                  weight:0,
 
                   fillColor:
-                    CORES_PATCH[cas],
+                    CORES[cas],
 
                   fillOpacity:
                     .035
@@ -4076,28 +3971,24 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
         }
 
 
-        window.atualizarPatchCAS =
-          atualizarPatchCAS;
-
-
-        /* ======================================================
-           13. BOTÕES "FILTRAR POR CAS"
-        ====================================================== */
+        /* =====================================================
+           10. BOTÕES CAS
+        ===================================================== */
 
         document
           .querySelectorAll(
             ".cas-btn"
           )
           .forEach(
-            function (btn) {
+            function(btn){
 
               btn.addEventListener(
                 "click",
-                function () {
+                function(){
 
                   setTimeout(
-                    atualizarPatchCAS,
-                    30
+                    atualizar,
+                    20
                   );
 
                 }
@@ -4107,53 +3998,50 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
           );
 
 
-        /* ======================================================
-           14. INTEGRA AO CHECKBOX TERRITÓRIOS DAS CAS
-        ====================================================== */
+        /* =====================================================
+           11. CHECKBOX DOS TERRITÓRIOS
+        ===================================================== */
 
-        const checkbox =
+        const check =
           document.getElementById(
             "toggleTerritoriosCASReal"
           );
 
 
-        if (checkbox) {
+        if(check){
 
-          checkbox.addEventListener(
+          check.addEventListener(
             "change",
-            function () {
+            function(){
 
-              if (
-                this.checked
-              ) {
+              if(this.checked){
 
-                if (
+                if(
                   !map.hasLayer(
-                    camadaPatch
+                    patch
                   )
-                ) {
+                ){
 
-                  camadaPatch.addTo(
+                  patch.addTo(
                     map
                   );
 
                 }
 
-
-                atualizarPatchCAS();
+                atualizar();
 
               }
 
-              else {
+              else{
 
-                if (
+                if(
                   map.hasLayer(
-                    camadaPatch
+                    patch
                   )
-                ) {
+                ){
 
                   map.removeLayer(
-                    camadaPatch
+                    patch
                   );
 
                 }
@@ -4166,20 +4054,19 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
         }
 
 
-        /* ======================================================
-           15. DIAGNÓSTICO
+        /* =====================================================
+           12. DIAGNÓSTICO
 
-           Abra F12 > Console.
-           Aqui veremos quais nomes a própria Prefeitura retornou.
-        ====================================================== */
+           Precisamos que apareçam apenas as cinco áreas.
+        ===================================================== */
 
         console.group(
-          "PATCH FINAL DAS 5 ÁREAS"
+          "PATCH LIMPO CAS"
         );
 
 
-        corrigidas.forEach(
-          function (feature) {
+        selecionados.forEach(
+          function(feature){
 
             console.log(
 
@@ -4187,9 +4074,7 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
               "→",
 
-              feature.properties.cas_patch,
-
-              feature.properties
+              feature.properties.cas_patch
 
             );
 
@@ -4198,27 +4083,23 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 
         console.log(
-          "Total de geometrias adicionadas:",
-          corrigidas.length
+          "Total:",
+          selecionados.length
         );
 
 
         console.groupEnd();
 
 
-        /* ======================================================
-           16. APLICA ESTADO INICIAL
-        ====================================================== */
-
-        atualizarPatchCAS();
+        atualizar();
 
       })
 
 
-      .catch(function (erro) {
+      .catch(function(erro){
 
         console.error(
-          "Erro no patch territorial CAS:",
+          "Erro no patch limpo:",
           erro
         );
 
@@ -4227,25 +4108,21 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
   }
 
 
-  /* ============================================================
-     17. EXECUÇÃO
-  ============================================================ */
-
-  if (
+  if(
     document.readyState ===
     "loading"
-  ) {
+  ){
 
     document.addEventListener(
       "DOMContentLoaded",
-      iniciarPatchCAS
+      iniciar
     );
 
   }
 
-  else {
+  else{
 
-    iniciarPatchCAS();
+    iniciar();
 
   }
 
