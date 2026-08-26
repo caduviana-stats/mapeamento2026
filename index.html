@@ -2031,6 +2031,13 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 </body></html>
 
+
+
+
+
+
+
+
 <style>
 /* MELHORIAS MOBILE */
   
@@ -2196,16 +2203,21 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 
 
+
+
+
+
+
+
+
+
+
 <script>
 /* ============================================================
    TERRITÓRIOS DAS 10 CAS
    MALHA OFICIAL DE BAIRROS DA PREFEITURA DO RIO
    + AGRUPAMENTO CONFORME A PLANILHA DO PROJETO
 
-   COLE ESTE BLOCO NO FINAL DO HTML.
-
-   IMPORTANTE:
-   remova antes todos os antigos testes de "Territórios das CAS".
 =============================================================== */
 
 (function () {
@@ -2330,7 +2342,7 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
        6. DISTRIBUIÇÃO BAIRRO -> CAS
 
        BASE:
-       planilha informada pelo usuário.
+       planilha
 
        Os casos definidos posteriormente prevalecem.
     ========================================================== */
@@ -3369,9 +3381,6 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
         /* ======================================================
            24. DIAGNÓSTICO
 
-           IMPORTANTE:
-           veja o console do navegador.
-
            Caso algum bairro oficial da Prefeitura não tenha
            correspondência na planilha, ele será listado aqui.
         ====================================================== */
@@ -3499,8 +3508,7 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 <!-- ============================================================
      CORREÇÃO DEFINITIVA DOS 5 TERRITÓRIOS
-     
-     NÃO DESENHA "REMENDOS" POR CIMA.
+   
      
      O script:
      1. aguarda o território principal;
@@ -3825,19 +3833,13 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
   /* ============================================================
      6. FUNÇÃO DE UNIÃO
 
-     Aqui a diferença é fundamental:
-
-     o script principal tentou unir dezenas de bairros
-     ao mesmo tempo.
-
      Agora uniremos:
 
      CAS já pronta
           +
      UM bairro
 
-     Isso é muito mais estável.
-  ============================================================ */
+      ============================================================ */
 
   function unirNaCAS(
     casFeature,
@@ -4061,10 +4063,6 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
          Agora os bairros fazem PARTE da geometria da CAS.
 
-         Não existe:
-         - camada de remendo;
-         - borda duplicada;
-         - polígono desenhado por cima.
       ======================================================== */
 
       const camadaCorrigida =
@@ -4300,8 +4298,6 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
       /* ========================================================
          16. CORRIGE O CHECKBOX
-
-         O listener antigo ainda conhece a camada antiga.
 
          Clonamos o checkbox para remover os listeners antigos
          e ligamos somente a camada corrigida.
