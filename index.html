@@ -33,9 +33,7 @@ const TYPE_COLORS={CAS:'#F97316',CRAS:'#FACC15',CREAS:'#DC2626',INSS:'#5B2C83',C
 const CAS_COLORS={"1ª CAS": "#2563EB", "2ª CAS": "#16A34A", "3ª CAS": "#F97316", "4ª CAS": "#DC2626", "5ª CAS": "#7C3AED", "6ª CAS": "#0891B2", "7ª CAS": "#CA8A04", "8ª CAS": "#92400E", "9ª CAS": "#DB2777", "10ª CAS": "#475569"};
 const map=L.map('map',{zoomControl:true,minZoom:10,maxZoom:17,preferCanvas:true}).setView([-22.91,-43.39],10);
 map.setMaxBounds([[-23.12,-43.83],[-22.70,-43.05]]);
-L.maplibreGL({
-    style: 'https://tiles.openfreemap.org/styles/positron'
-}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:20}).addTo(map);
 const layers={CAS:L.layerGroup().addTo(map),CRAS:L.layerGroup().addTo(map),CREAS:L.layerGroup().addTo(map),INSS:L.layerGroup().addTo(map)};
 const markers=[];
 function escapeHtml(s){return String(s||'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
@@ -52,20 +50,6 @@ const input=document.getElementById('searchInput'), results=document.getElementB
 input.addEventListener('input',()=>{const q=input.value.trim().toLowerCase();results.innerHTML='';if(q.length<2){results.style.display='none';return;}const found=markers.filter(m=>{const p=m._props;return [p.nome,p.tipo,p.cas,p.cas_nome,p.bairro,p.endereco,p.abrangencia].join(' ').toLowerCase().includes(q)}).slice(0,10);found.forEach(m=>{const p=m._props;const div=document.createElement('div');div.className='result';div.innerHTML=`<b>${escapeHtml(p.nome)}</b><p>${escapeHtml(p.tipo)}${p.cas?' · '+escapeHtml(p.cas):''} · ${escapeHtml(p.bairro||p.cas_nome||'')}</p>`;div.onclick=()=>{results.style.display='none';input.value=p.nome;focusMarker(m)};results.appendChild(div);});results.style.display=found.length?'block':'none';});
 document.getElementById('closeDrawer').onclick=()=>document.getElementById('drawer').classList.remove('open');
 map.on('click',()=>{results.style.display='none'});
-
-<!-- MapLibre GL -->
-<link
-  href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css"
-  rel="stylesheet"
-/>
-
-<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-
-<!-- Integração MapLibre + Leaflet -->
-<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-
-
-  
 </script>
 <!-- =========================================================
 BLOCO NOVAS CAMADAS SMAS-RIO
