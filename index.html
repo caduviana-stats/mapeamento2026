@@ -5033,3 +5033,99 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
 
 })();
 </script>
+
+
+
+
+<script>
+/* ============================================================
+   CORREÇÃO DEFINITIVA DO MAPA-BASE
+   Remove qualquer camada CARTO existente
+   e substitui por OpenStreetMap sem API key.
+============================================================ */
+
+(function(){
+
+  function corrigirMapaBase(){
+
+    if (
+      typeof L === "undefined" ||
+      typeof map === "undefined"
+    ){
+      setTimeout(corrigirMapaBase, 300);
+      return;
+    }
+
+    /* Remove qualquer TileLayer da CARTO */
+    const remover = [];
+
+    map.eachLayer(function(layer){
+
+      if (
+        layer instanceof L.TileLayer &&
+        layer._url &&
+        (
+          layer._url.includes("cartocdn") ||
+          layer._url.includes("carto.com") ||
+          layer._url.includes("basemaps.carto")
+        )
+      ){
+        remover.push(layer);
+      }
+
+    });
+
+    remover.forEach(function(layer){
+      map.removeLayer(layer);
+    });
+
+
+    /* Adiciona mapa-base novo */
+    const novoMapaBase = L.tileLayer(
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }
+    );
+
+    novoMapaBase.addTo(map);
+
+    /* manda o mapa-base para baixo das outras camadas */
+    novoMapaBase.bringToBack();
+
+    window.mapaBaseAtual = novoMapaBase;
+
+
+    /* Atualiza o texto no canto inferior */
+    const badge =
+      document.querySelector('.footer-badge');
+
+    if (badge){
+      badge.textContent =
+        'Mapa base · OpenStreetMap';
+    }
+
+
+    console.log(
+      'Mapa-base CARTO removido. OpenStreetMap carregado.'
+    );
+
+  }
+
+
+  if (document.readyState === "loading"){
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      corrigirMapaBase
+    );
+
+  } else {
+
+    corrigirMapaBase();
+
+  }
+
+})();
+</script>
