@@ -35,6 +35,10 @@ const TYPE_COLORS={CAS:'#F97316',CRAS:'#FACC15',CREAS:'#DC2626',INSS:'#5B2C83',C
 const CAS_COLORS={"1ª CAS": "#2563EB", "2ª CAS": "#16A34A", "3ª CAS": "#F97316", "4ª CAS": "#DC2626", "5ª CAS": "#7C3AED", "6ª CAS": "#0891B2", "7ª CAS": "#CA8A04", "8ª CAS": "#92400E", "9ª CAS": "#DB2777", "10ª CAS": "#475569"};
 const map=L.map('map',{zoomControl:true,minZoom:10,maxZoom:17,preferCanvas:true}).setView([-22.91,-43.39],10);
 map.setMaxBounds([[-23.12,-43.83],[-22.70,-43.05]]);
+
+  const baseMap = L.maplibreGL({
+  style: 'https://tiles.openfreemap.org/styles/positron'
+}).addTo(map);
   
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   subdomains: 'abcd',
@@ -2179,6 +2183,13 @@ Inclui pontos com latitude/longitude, filtros, legenda e atualização do contad
     display:none;
   }
 }
+
+
+  /* MAPA-BASE EM ESCALA DE CINZA */
+.maplibregl-canvas {
+  filter: grayscale(100%) saturate(0%) brightness(1.12) contrast(0.82);
+}
+  
 </style>
 
 <script>
